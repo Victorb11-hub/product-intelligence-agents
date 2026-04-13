@@ -1,0 +1,23 @@
+# Core
+fastapi>=0.115.0
+uvicorn>=0.32.0
+supabase>=2.10.0
+pydantic>=2.10.0
+requests>=2.32.0
+
+# Apify — powers 9 platform agents
+apify-client>=1.8.0
+
+# Google Trends — free, no API key
+pytrends>=4.9.0
+
+# YouTube Data API v3
+google-api-python-client>=2.150.0
+
+# NLP / Sentiment analysis
+transformers>=4.46.0
+torch>=2.5.0
+numpy>=1.26.0
+
+# Claude API for summaries
+anthropic>=0.40.0

@@ -1,0 +1,4 @@
+ALTER TABLE products ADD COLUMN IF NOT EXISTS raw_score float DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS coverage_pct int DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS active_jobs int DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS total_jobs int DEFAULT 4;
