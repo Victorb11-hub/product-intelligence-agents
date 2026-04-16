@@ -324,10 +324,19 @@ def _score_product(db, product, run_id):
         satisfaction = amazon.get("satisfaction_score", 0) or 0
         satisfaction_norm = max(0, min(100, satisfaction))
 
-        # Repeat purchase / high intent from reviews
-        high_intent = amazon.get("high_intent_count", 0) or 0
-        total_reviews = amazon.get("review_count", 1) or 1
-        repeat_norm = min(100, (high_intent / max(total_reviews, 1)) * 500)
+        # Repeat purchase — use repeat_purchase_mentions from AI topic extraction
+        # (falls back to monthly_volume proxy in the agent when no AI topic found)
+        repeat_mentions = amazon.get("repeat_purchase_mentions", 0) or 0
+        rt1 = _env_int("AMAZON_REPEAT_TIER_1", 50)
+        rt2 = _env_int("AMAZON_REPEAT_TIER_2", 150)
+        rt3 = _env_int("AMAZON_REPEAT_TIER_3", 300)
+        rt4 = _env_int("AMAZON_REPEAT_TIER_4", 500)
+        if repeat_mentions <= 0: repeat_norm = 0
+        elif repeat_mentions <= rt1: repeat_norm = 20
+        elif repeat_mentions <= rt2: repeat_norm = 40
+        elif repeat_mentions <= rt3: repeat_norm = 60
+        elif repeat_mentions <= rt4: repeat_norm = 80
+        else: repeat_norm = 100
 
         # Review velocity — monthly rate
         vel_monthly = amazon.get("review_velocity_monthly", 0) or 0
@@ -345,8 +354,8 @@ def _score_product(db, product, run_id):
             w_vol, w_rep, w_sat, w_bsr, w_vel = w_vol/w_sum, w_rep/w_sum, w_sat/w_sum, w_bsr/w_sum, w_vel/w_sum
 
         job3 = vol_norm * w_vol + repeat_norm * w_rep + satisfaction_norm * w_sat + bsr_norm * w_bsr + vel_norm * w_vel
-        logger.info("[scoring] Job 3: vol=%.1f(%d/mo) repeat=%.1f satisfaction=%.1f bsr=%.1f(%s) vel=%.1f → %.1f",
-                    vol_norm, mpv, repeat_norm, satisfaction_norm, bsr_norm, bsr_trend, vel_norm, job3)
+        logger.info("[scoring] Job 3: vol=%.1f(%d/mo) repeat=%.1f(%d mentions) satisfaction=%.1f bsr=%.1f(%s) vel=%.1f → %.1f",
+                    vol_norm, mpv, repeat_norm, repeat_mentions, satisfaction_norm, bsr_norm, bsr_trend, vel_norm, job3)
 
     # Job 4: Supply Readiness (Alibaba 100%)
     job4 = None

@@ -1,0 +1,688 @@
+[ok] APIFY_API_TOKEN loaded (len=46)
+[run] starting actor junglee/amazon-crawler ...
+[run] status=SUCCEEDED dataset=ZUw71tB0vbY3GURTn
+[run] received 1 item(s)
+
+==============================================================================
+TOP-LEVEL FIELD DUMP
+==============================================================================
+
+--- 'title'  (str) ---
+'Mediheal Official Best Korean Sheet Mask - Collagen Essential Face Mask 10 Sheets Lifting and Firming For All Skin Types Value Sets'
+
+--- 'url'  (str) ---
+'https://www.amazon.com/dp/B09XWHB1HR'
+
+--- 'asin'  (str) ---
+'B09XWHB1HR'
+
+--- 'originalAsin'  (str) ---
+'B09XWHB1HR'
+
+--- 'price'  (dict) ---
+dict(keys=2)
+  'value': 22
+  'currency': '$'
+
+--- 'inStock'  (bool) ---
+True
+
+--- 'inStockText'  (str) ---
+'In Stock  In Stock'
+
+--- 'listPrice'  (None) ---
+null
+
+--- 'brand'  (str) ---
+'Mediheal'
+
+--- 'author'  (None) ---
+null
+
+--- 'shippingPrice'  (None) ---
+null
+
+--- 'stars'  (float) ---
+4.6
+
+--- 'starsBreakdown'  (dict) ---
+dict(keys=5)
+  '5star': 0.79
+  '4star': 0.14
+  '3star': 0.04
+  '2star': 0.01
+  '1star': 0.02
+
+--- 'reviewsCount'  (int) ---
+1534
+
+--- 'answeredQuestions'  (None) ---
+null
+
+--- 'breadCrumbs'  (str) ---
+'Beauty & Personal Care > Skin Care > Face > Treatments & Masks > Masks'
+
+--- 'videosCount'  (int) ---
+6
+
+--- 'visitStoreLink'  (dict) ---
+dict(keys=2)
+  'text': 'Visit the Mediheal Store'
+  'url': 'https://www.amazon.com/stores/MEDIHEAL/page/C5A92CA3-430E-4103-8605-E24189015BB9?lp_asin=B09XWHB1HR&ref_=ast_bln&store_ref=bl_ast_dp_brandlogo_sto'
+
+--- 'thumbnailImage'  (str) ---
+'https://m.media-amazon.com/images/I/41KPQ4VZDjL._SY300_SX300_QL70_FMwebp_.jpg'
+
+--- 'galleryThumbnails'  (list) ---
+list(len=6)
+  [0] (str):
+      'https://m.media-amazon.com/images/I/41KPQ4VZDjL._SS.jpg'
+  [1] (str):
+      'https://m.media-amazon.com/images/I/41vmehD0n4L._SS.jpg'
+  ... (4 more items)
+
+--- 'highResolutionImages'  (list) ---
+list(len=6)
+  [0] (str):
+      'https://m.media-amazon.com/images/I/61nWG4N1b+L._SL1500_.jpg'
+  [1] (str):
+      'https://m.media-amazon.com/images/I/615W5lSl0SL._SL1500_.jpg'
+  ... (4 more items)
+
+--- 'importantInformation'  (dict) ---
+dict(keys=2)
+  'title': 'Important information'
+  'items': list(len=2)
+      [0] (dict):
+          'title': 'Safety Information'
+          'text': 'For external use only'
+          'url': null
+      [1] (dict):
+          'title': 'Ingredients'
+          'text': 'Water, Glycerine, Methylpropanediol, Propanediol, 1,2-Hexanediol, Hydroxyacetophenone, Hydrolyzed Extensin (Carrot Collagen 1,200Ppm), Panthenol, Betaine, Trehalose, Adenosine, Disodium EDTA, Carbomer, Arginine, Octyldodeceth-16, Xanthan Gum, Sodium Hyaluronate, Sodium Polyacrylate, Glycine, Glutamic Acid, Aspartic Acid, Tremella Fuciformis Polysaccharide*(10 Ppm), Sodium Chloride, Soluble Collagen (Vegan Collagen 1Ppm), Serine, Histidine, Alanine, Threonine, Proline, Acrylates/\u200bC10-30 Alkyl Acr ... [+162 more chars]'
+          'url': null
+
+--- 'sustainabilityFeatures'  (None) ---
+null
+
+--- 'description'  (None) ---
+null
+
+--- 'features'  (list) ---
+list(len=5)
+  [0] (str):
+      'UNLEASH THE POWER OF KOREAN BEAUTY - ultimate solution to achieving a youthful, radiant complexion. This easy-to-use facial mask is designed to fit comfortably on your face, ensuring maximum absorption of our potent formula. Perfect for all skin types, our Korean collagen sheet mask is a must-have in your daily skincare routine.'
+  [1] (str):
+      'FIRM, PLUMP AND RESTORE SKIN - formulated with 3x more Collagen actives than our first generation mask for an intensive firming effect. Our proprietary patented HYDRODEEPER complex with essential moisturizing factors helps improve hydration and maintain a healthy skin barrier.'
+  ... (3 more items)
+
+--- 'attributes'  (list) ---
+list(len=22)
+  [0] (dict):
+      'key': 'Item Form'
+      'value': 'Sheet'
+  [1] (dict):
+      'key': 'Product Benefits'
+      'value': 'Firming'
+  ... (20 more items)
+
+--- 'productOverview'  (list) ---
+list(len=5)
+  [0] (dict):
+      'key': 'Brand'
+      'value': 'Mediheal'
+  [1] (dict):
+      'key': 'Item Form'
+      'value': 'Sheet'
+  ... (3 more items)
+
+--- 'variantAsins'  (list) ---
+list(len=18)
+  [0] (str):
+      'B08QRV2GYX'
+  [1] (str):
+      'B0BLGYF23V'
+  ... (16 more items)
+
+--- 'variantDetails'  (list) ---
+list(len=18)
+  [0] (dict):
+      'name': '20 Count (Pack of 1) Tea Tree'
+      'thumbnail': 'https://m.media-amazon.com/images/I/41D80Im6gIL._SS.jpg'
+      'images': list(len=1)
+        [0] (str):
+            'https://m.media-amazon.com/images/I/71B9uYR6cAL._SL1500_.jpg'
+      'asin': 'B08QRV2GYX'
+      'price': null
+  [1] (dict):
+      'name': '4 Count (Pack of 1) Tea Tree'
+      'thumbnail': 'https://m.media-amazon.com/images/I/41iDpjxCpeL._SS.jpg'
+      'images': list(len=1)
+        [0] (str):
+            'https://m.media-amazon.com/images/I/61IOH-DNktL._SL1500_.jpg'
+      'asin': 'B0BLGYF23V'
+      'price': null
+  ... (16 more items)
+
+--- 'reviewsLink'  (str) ---
+'https://www.amazon.com/product-reviews/B09XWHB1HR'
+
+--- 'hasReviews'  (bool) ---
+True
+
+--- 'delivery'  (str) ---
+'Tuesday, April 21'
+
+--- 'fastestDelivery'  (str) ---
+'Tuesday, April 21'
+
+--- 'condition'  (None) ---
+null
+
+--- 'returnPolicy'  (None) ---
+null
+
+--- 'support'  (None) ---
+null
+
+--- 'variantAttributes'  (list) ---
+list(len=2)
+  [0] (dict):
+      'key': 'Size'
+      'value': '10 Count (Pack of 1)'
+  [1] (dict):
+      'key': 'Color'
+      'value': 'Collagen'
+
+--- 'manufacturerAttributes'  (list) ---
+list(len=0)
+
+--- 'seller'  (dict) ---
+dict(keys=5)
+  'name': 'HANSUNG BEAUTY'
+  'id': 'A3895KWHIX5GCA'
+  'url': 'https://www.amazon.com/sp?seller=A3895KWHIX5GCA'
+  'reviewsCount': null
+  'averageRating': null
+
+--- 'bestsellerRanks'  (list) ---
+list(len=2)
+  [0] (dict):
+      'rank': 5272
+      'category': 'Beauty & Personal Care'
+      'url': 'https://www.amazon.com/gp/bestsellers/beauty/ref=pd_zg_ts_beauty'
+  [1] (dict):
+      'rank': 37
+      'category': 'Facial Masks'
+      'url': 'https://www.amazon.com/gp/bestsellers/beauty/11061121/ref=pd_zg_hrsr_beauty'
+
+--- 'isAmazonChoice'  (bool) ---
+False
+
+--- 'amazonChoiceText'  (None) ---
+null
+
+--- 'bookDescription'  (None) ---
+null
+
+--- 'priceRange'  (None) ---
+null
+
+--- 'aPlusContent'  (dict) ---
+dict(keys=5)
+  'title': 'Product description'
+  'rawText': 'Product description\nMediheal Collagen Essential Mask \nFirm, plump and restore skin \nDefy age and get youthful, bouncy looking skin with three different types of Collagen. This intensive anti-aging treatment mask hydrates, firms and revitalizes skin. \nHow To Use \nAfter cleansing and toning, apply mask.\nPull upward to fit the mask tightly to face, adjusting to fit around eyes, nose and mouth. \nRelax for 10 - 20 minutes. \nRemove and discard the mask. Lightly tap remaining essence to help it absorb  ... [+2453 more chars]'
+  'rawImages': list(len=13)
+      [0] (dict):
+          'name': 'Mediheal global beauty brand face mask korean facial sheets skin care pack sheet masks bulk spa'
+          'url': 'https://m.media-amazon.com/images/S/aplus-media-library-service-media/0005279c-c33a-4e59-8a3d-ff12282652c2.__CR18,0,1164,360_PT0_SX970_V1___.png'
+      [1] (dict):
+          'name': 'Collagen essential mask cara set women men products 面膜 teenage girls best'
+          'url': 'https://m.media-amazon.com/images/S/aplus-media-library-service-media/daa24208-77c8-4fbd-8f7b-4aebc1aee98e.__CR0,0,600,600_PT0_SX300_V1___.png'
+      ... (11 more items)
+  'rawVideos': list(len=0)
+  'modules': list(len=6)
+      [0] (dict):
+          'type': 'module-12'
+          'title': null
+          'image': dict(keys=2)
+            'name': 'Mediheal global beauty brand face mask korean facial sheets skin care pack sheet masks bulk spa'
+            'url': 'https://m.media-amazon.com/images/S/aplus-media-library-service-media/0005279c-c33a-4e59-8a3d-ff12282652c2.__CR18,0,1164,360_PT0_SX970_V1___.png'
+      [1] (dict):
+          'type': 'module-8'
+          'title': 'Mediheal Collagen Essential Mask'
+          'text': 'Defy age and get youthful, bouncy looking skin with three different types of Collagen. This intensive anti-aging treatment mask hydrates, firms and revitalizes skin. \nAfter cleansing and toning, apply mask.\nPull upward to fit the mask tightly to face, adjusting to fit around eyes, nose and mouth. \nRelax for 10 - 20 minutes. \nRemove and discard the mask. Lightly tap remaining essence to help it absorb into skin.'
+          'image': dict(keys=2)
+            'name': 'Collagen essential mask cara set women men products 面膜 teenage girls best'
+            'url': 'https://m.media-amazon.com/images/S/aplus-media-library-service-media/daa24208-77c8-4fbd-8f7b-4aebc1aee98e.__CR0,0,600,600_PT0_SX300_V1___.png'
+          'rightColumn': dict(keys=2)
+            'title': null
+            'text': 'Collagen Active 3X Complex \nFSC Certified + Soy Ink Printed Cartons'
+      ... (4 more items)
+
+--- 'brandStory'  (dict) ---
+dict(keys=3)
+  'title': 'From the brand'
+  'image': dict(keys=2)
+      'name': '.'
+      'url': 'https://m.media-amazon.com/images/S/aplus-media-library-service-media/48427311-cf93-4002-b834-a62739f7bb1d.__CR0,0,3050,1302_PT0_SX1464_V1___.png'
+  'items': list(len=9)
+      [0] (dict):
+          'title': null
+          'text': null
+          'url': null
+          'image': dict(keys=2)
+            'name': 'our solution'
+            'url': 'https://m.media-amazon.com/images/S/aplus-media-library-service-media/4c560b20-51eb-4680-9b6f-ad9cfab350f7.__CR0,0,362,453_PT0_SX362_V1___.png'
+          'items': list(len=0)
+      [1] (dict):
+          'title': null
+          'text': null
+          'url': null
+          'image': dict(keys=2)
+            'name': '.'
+            'url': 'https://m.media-amazon.com/images/S/aplus-media-library-service-media/fe4d94ce-5f89-476a-9c5d-1e6bd6f02a1f.__CR0,0,1508,1887_PT0_SX362_V1___.jpg'
+          'items': list(len=0)
+      ... (7 more items)
+
+--- 'productComparison'  (None) ---
+null
+
+--- 'aiReviewsSummary'  (dict) ---
+dict(keys=2)
+  'text': "Customers find the sheet mask effective, noting it works wonders for their skin and leaves it refreshed, with one mentioning it helps with wrinkles. The mask is moisturizing, with customers saying it hydrates throughout the day, and they appreciate its quality and how it makes their skin softer for days. Moreover, they report it doesn't irritate their skin at all, leaving them with a spa-like experience, and create a plump, glowing appearance. While some find it easy to use, others mention it ca ... [+135 more chars]"
+  'keywords': list(len=8)
+      [0] (dict):
+          'name': 'Effectiveness'
+          'sentiment': 'positive'
+          'text': 'Customers report that the mask works wonders for their skin, making it smoother and healthier, with one customer noting it helps improve wrinkles.'
+          'customersMentionedCount': dict(keys=3)
+            'total': 91
+            'positive': 80
+            'negative': 11
+          'partialReviews': list(len=4)
+            [0] (dict):
+                'text': 'Used product for many years with great results'
+                'highlightedPart': 'great results'
+                'url': 'https://www.amazon.com/gp/customer-reviews/R3IIKPG0BHK6L6'
+            [1] (dict):
+                'text': '...After just a week, my fine lines became less visible. It’s hydrating, effective, and a great addition to my skincare routine. Highly recommend!'
+                'highlightedPart': 'effective'
+                'url': 'https://www.amazon.com/gp/customer-reviews/RSKZ5N3IDNZ17'
+            ... (2 more items)
+      [1] (dict):
+          'name': 'Moisturizing'
+          'sentiment': 'positive'
+          'text': 'Customers find the sheet mask effective at moisturizing, noting that it keeps skin hydrated throughout the day and leaves it feeling nourished.'
+          'customersMentionedCount': dict(keys=3)
+            'total': 82
+            'positive': 77
+            'negative': 5
+          'partialReviews': list(len=4)
+            [0] (dict):
+                'text': '...They fit my big face perfectly. They had a lot of serum and were very moisturizing.'
+                'highlightedPart': 'very moisturizing'
+                'url': 'https://www.amazon.com/gp/customer-reviews/R3V37YYDT1TGTQ'
+            [1] (dict):
+                'text': '...After just a week, my fine lines became less visible. It’s hydrating, effective, and a great addition to my skincare routine. Highly recommend!'
+                'highlightedPart': 'hydrating'
+                'url': 'https://www.amazon.com/gp/customer-reviews/RSKZ5N3IDNZ17'
+            ... (2 more items)
+      ... (6 more items)
+
+--- 'monthlyPurchaseVolume'  (str) ---
+'1K+ bought in past month'
+
+--- 'productPageReviews'  (list) ---
+list(len=8)
+  [0] (dict):
+      'username': 'Luvbugg'
+      'userId': 'amzn1.account.AGW74NBI6AEFVPPRAFF7WACDN7MA'
+      'userProfileLink': 'https://www.amazon.com/gp/profile/amzn1.account.AGW74NBI6AEFVPPRAFF7WACDN7MA'
+      'ratingScore': 5
+      'reviewTitle': 'Highly recommend for all skin types. ✨💆🏽\u200d♀️'
+      'reviewDescription': 'This Mediheal Collagen Essential Face Mask is a total skin reset in a pouch. From the first use, my skin felt noticeably firmer, smoother, and deeply hydrated. The sheet fits comfortably and adheres well without slipping, so you actually get to relax while it works.'
+      'date': '2026-02-18'
+      'position': 1
+      'reviewedIn': 'Reviewed in the United States on February 18, 2026'
+      'reviewId': 'R34Q3YOR4XU73T'
+      'reviewUrl': 'https://www.amazon.com/gp/customer-reviews/R34Q3YOR4XU73T/ref=cm_cr_dp_d_rvw_ttl?ie=UTF8'
+      'reviewImages': list(len=0)
+      'reviewReaction': 'One person found this helpful'
+      'isVerified': False
+      'isAmazonVine': False
+      'avatar': null
+      'variant': 'Size: 10 Count (Pack of 1), Color: Collagen'
+      'variantAttributes': list(len=2)
+        [0] (dict):
+            'key': 'Size'
+            'value': '10 Count (Pack of 1)'
+        [1] (dict):
+            'key': 'Color'
+            'value': 'Collagen'
+  [1] (dict):
+      'username': 'hunny'
+      'userId': 'amzn1.account.AFMU5ORQQVUMR4ZLT3NHQGUDAANA'
+      'userProfileLink': 'https://www.amazon.com/gp/profile/amzn1.account.AFMU5ORQQVUMR4ZLT3NHQGUDAANA'
+      'ratingScore': 5
+      'reviewTitle': 'My #1 Mask'
+      'reviewDescription': "I've been using face masks since I was little. I've tried lots of different brands and ingredients. This is my self care item, it's something I always have on hand to use when I want to unwind or my skin needs some TLC and moisture. With any sheet mask, I feel moisturized after and it's a nice feeling resting with one on. This one, however, is a step up from that in that it rejuvenates my skin times 100 compared to all other masks I've used. I don't know how to explain it, but afterwards my skin ... [+1081 more chars]"
+      'date': '2025-03-27'
+      'position': 2
+      'reviewedIn': 'Reviewed in the United States on March 27, 2025'
+      'reviewId': 'R3AYS7V90ZCLQ1'
+      'reviewUrl': 'https://www.amazon.com/gp/customer-reviews/R3AYS7V90ZCLQ1/ref=cm_cr_dp_d_rvw_ttl?ie=UTF8'
+      'reviewImages': list(len=0)
+      'reviewReaction': '67 people found this helpful'
+      'isVerified': False
+      'isAmazonVine': False
+      'avatar': 'https://m.media-amazon.com/images/S/amazon-avatars-global/57363059-8cee-406e-8506-f61db8bcef1f._CR28%2C0%2C443%2C443_SX460_.jpg'
+      'variant': 'Size: 10 Count (Pack of 1), Color: Collagen'
+      'variantAttributes': list(len=2)
+        [0] (dict):
+            'key': 'Size'
+            'value': '10 Count (Pack of 1)'
+        [1] (dict):
+            'key': 'Color'
+            'value': 'Collagen'
+  ... (6 more items)
+
+--- 'productPageReviewsFromOtherCountries'  (list) ---
+list(len=5)
+  [0] (dict):
+      'username': 'Ms. Ais'
+      'userId': null
+      'userProfileLink': null
+      'ratingScore': 1
+      'reviewTitle': 'Quantity not correct'
+      'reviewDescription': 'Only gave 3 packs.'
+      'date': '2025-06-03'
+      'position': 1
+      'reviewedIn': 'Reviewed in the United Arab Emirates on June 3, 2025'
+      'reviewId': 'R104K0B9LX6R9C'
+      'reviewUrl': null
+      'reviewImages': list(len=0)
+      'reviewReaction': null
+      'isVerified': False
+      'isAmazonVine': False
+      'avatar': null
+      'variant': ''
+      'variantAttributes': list(len=0)
+  [1] (dict):
+      'username': 'Ngo'
+      'userId': null
+      'userProfileLink': null
+      'ratingScore': 5
+      'reviewTitle': 'Top'
+      'reviewDescription': 'Supers masques !'
+      'date': '2025-10-20'
+      'position': 2
+      'reviewedIn': 'Reviewed in France on October 20, 2025'
+      'reviewId': 'R22JFTZBL783CZ'
+      'reviewUrl': null
+      'reviewImages': list(len=0)
+      'reviewReaction': null
+      'isVerified': False
+      'isAmazonVine': False
+      'avatar': null
+      'variant': 'Size: 10 Count (Pack of 1), Color: Collagen'
+      'variantAttributes': list(len=2)
+        [0] (dict):
+            'key': 'Size'
+            'value': '10 Count (Pack of 1)'
+        [1] (dict):
+            'key': 'Color'
+            'value': 'Collagen'
+  ... (3 more items)
+
+--- 'locationText'  (str) ---
+'Update location'
+
+--- 'loadedCountryCode'  (str) ---
+'US'
+
+--- 'offers'  (list) ---
+list(len=0)
+
+--- 'unNormalizedProductUrl'  (str) ---
+'https://www.amazon.com/s?k=korean+sheet+mask&s=popularity-rank'
+
+--- 'categoryPageData'  (dict) ---
+dict(keys=5)
+  'pageNumber': 1
+  'saleSummary': null
+  'isSponsored': False
+  'bestsellerBadge': null
+  'productPosition': 6
+
+--- 'input'  (str) ---
+'https://www.amazon.com/s?k=korean+sheet+mask'
+
+==============================================================================
+HIGH-VALUE FIELD SPOTLIGHT
+==============================================================================
+
+>>> asin  (str)
+    'B09XWHB1HR'
+
+>>> title  (str)
+    'Mediheal Official Best Korean Sheet Mask - Collagen Essential Face Mask 10 Sheets Lifting and Firming For All Skin Types Value Sets'
+
+>>> price  (dict)
+    dict(keys=2)
+            'value': 22
+            'currency': '$'
+
+>>> stars  (float)
+    4.6
+
+>>> reviewsCount  (int)
+    1534
+
+>>> bestsellerRanks  (list)
+    length: 2
+    first item:
+    dict(keys=3)
+            'rank': 5272
+            'category': 'Beauty & Personal Care'
+            'url': 'https://www.amazon.com/gp/bestsellers/beauty/ref=pd_zg_ts_beauty'
+
+>>> bestSellerRanks  [NOT PRESENT]
+
+>>> monthlyPurchaseVolume  (str)
+    '1K+ bought in past month'
+
+>>> aiReviewsSummary  (dict)
+    dict(keys=2)
+            'text': "Customers find the sheet mask effective, noting it works wonders for their skin and leaves it refreshed, with one mentioning it helps with wrinkles. The mask is moisturizing, with customers saying it hydrates throughout the day, and they appreciate its quality and how it makes their skin softer for days. Moreover, they report it doesn't irritate their skin at all, leaving them with a spa-like experience, and create a plump, glowing appearance. While some find it easy to use, others mention it ca ... [+135 more chars]"
+            'keywords': list(len=8)
+                [0] (dict):
+                    'name': 'Effectiveness'
+                    'sentiment': 'positive'
+                    'text': 'Customers report that the mask works wonders for their skin, making it smoother and healthier, with one customer noting it helps improve wrinkles.'
+                    'customersMentionedCount': dict(keys=3)
+                      'total': 91
+                      'positive': 80
+                      'negative': 11
+                    'partialReviews': list(len=4)
+                      [0] (dict):
+                          'text': 'Used product for many years with great results'
+                          'highlightedPart': 'great results'
+                          'url': 'https://www.amazon.com/gp/customer-reviews/R3IIKPG0BHK6L6'
+                      [1] (dict):
+                          'text': '...After just a week, my fine lines became less visible. It’s hydrating, effective, and a great addition to my skincare routine. Highly recommend!'
+                          'highlightedPart': 'effective'
+                          'url': 'https://www.amazon.com/gp/customer-reviews/RSKZ5N3IDNZ17'
+                      ... (2 more items)
+                [1] (dict):
+                    'name': 'Moisturizing'
+                    'sentiment': 'positive'
+                    'text': 'Customers find the sheet mask effective at moisturizing, noting that it keeps skin hydrated throughout the day and leaves it feeling nourished.'
+                    'customersMentionedCount': dict(keys=3)
+                      'total': 82
+                      'positive': 77
+                      'negative': 5
+                    'partialReviews': list(len=4)
+                      [0] (dict):
+                          'text': '...They fit my big face perfectly. They had a lot of serum and were very moisturizing.'
+                          'highlightedPart': 'very moisturizing'
+                          'url': 'https://www.amazon.com/gp/customer-reviews/R3V37YYDT1TGTQ'
+                      [1] (dict):
+                          'text': '...After just a week, my fine lines became less visible. It’s hydrating, effective, and a great addition to my skincare routine. Highly recommend!'
+                          'highlightedPart': 'hydrating'
+                          'url': 'https://www.amazon.com/gp/customer-reviews/RSKZ5N3IDNZ17'
+                      ... (2 more items)
+                ... (6 more items)
+
+>>> productPageReviews  (list)
+    length: 8
+    first item:
+    dict(keys=18)
+            'username': 'Luvbugg'
+            'userId': 'amzn1.account.AGW74NBI6AEFVPPRAFF7WACDN7MA'
+            'userProfileLink': 'https://www.amazon.com/gp/profile/amzn1.account.AGW74NBI6AEFVPPRAFF7WACDN7MA'
+            'ratingScore': 5
+            'reviewTitle': 'Highly recommend for all skin types. ✨💆🏽\u200d♀️'
+            'reviewDescription': 'This Mediheal Collagen Essential Face Mask is a total skin reset in a pouch. From the first use, my skin felt noticeably firmer, smoother, and deeply hydrated. The sheet fits comfortably and adheres well without slipping, so you actually get to relax while it works.'
+            'date': '2026-02-18'
+            'position': 1
+            'reviewedIn': 'Reviewed in the United States on February 18, 2026'
+            'reviewId': 'R34Q3YOR4XU73T'
+            'reviewUrl': 'https://www.amazon.com/gp/customer-reviews/R34Q3YOR4XU73T/ref=cm_cr_dp_d_rvw_ttl?ie=UTF8'
+            'reviewImages': list(len=0)
+            'reviewReaction': 'One person found this helpful'
+            'isVerified': False
+            'isAmazonVine': False
+            'avatar': null
+            'variant': 'Size: 10 Count (Pack of 1), Color: Collagen'
+            'variantAttributes': list(len=2)
+                [0] (dict):
+                    'key': 'Size'
+                    'value': '10 Count (Pack of 1)'
+                [1] (dict):
+                    'key': 'Color'
+                    'value': 'Collagen'
+
+>>> starsBreakdown  (dict)
+    dict(keys=5)
+            '5star': 0.79
+            '4star': 0.14
+            '3star': 0.04
+            '2star': 0.01
+            '1star': 0.02
+
+>>> variants  [NOT PRESENT]
+
+>>> options  [NOT PRESENT]
+
+>>> brand  (str)
+    'Mediheal'
+
+>>> seller  (dict)
+    dict(keys=5)
+            'name': 'HANSUNG BEAUTY'
+            'id': 'A3895KWHIX5GCA'
+            'url': 'https://www.amazon.com/sp?seller=A3895KWHIX5GCA'
+            'reviewsCount': null
+            'averageRating': null
+
+>>> sellerInfo  [NOT PRESENT]
+
+>>> sellerName  [NOT PRESENT]
+
+>>> images  [NOT PRESENT]
+
+>>> features  (list)
+    length: 5
+    first item:
+    'UNLEASH THE POWER OF KOREAN BEAUTY - ultimate solution to achieving a youthful, radiant complexion. This easy-to-use facial mask is designed to fit comfortably on your face, ensuring maximum absorption of our potent formula. Perfect for all skin types, our Korean collagen sheet mask is a must-have in your daily skincare routine.'
+
+>>> bulletPoints  [NOT PRESENT]
+
+>>> featureBullets  [NOT PRESENT]
+
+==============================================================================
+SUMMARY STATS
+==============================================================================
+Total top-level fields : 57
+Populated fields       : 42
+Empty / null fields    : 15
+Approx JSON size (UTF-8 bytes): 54,899
+
+Empty / null fields:
+  - listPrice: None
+  - author: None
+  - shippingPrice: None
+  - answeredQuestions: None
+  - sustainabilityFeatures: None
+  - description: None
+  - condition: None
+  - returnPolicy: None
+  - support: None
+  - manufacturerAttributes: []
+  - amazonChoiceText: None
+  - bookDescription: None
+  - priceRange: None
+  - productComparison: None
+  - offers: []
+
+All top-level keys (alphabetical):
+  - aPlusContent  (dict)
+  - aiReviewsSummary  (dict)
+  - amazonChoiceText  (None)
+  - answeredQuestions  (None)
+  - asin  (str)
+  - attributes  (list)
+  - author  (None)
+  - bestsellerRanks  (list)
+  - bookDescription  (None)
+  - brand  (str)
+  - brandStory  (dict)
+  - breadCrumbs  (str)
+  - categoryPageData  (dict)
+  - condition  (None)
+  - delivery  (str)
+  - description  (None)
+  - fastestDelivery  (str)
+  - features  (list)
+  - galleryThumbnails  (list)
+  - hasReviews  (bool)
+  - highResolutionImages  (list)
+  - importantInformation  (dict)
+  - inStock  (bool)
+  - inStockText  (str)
+  - input  (str)
+  - isAmazonChoice  (bool)
+  - listPrice  (None)
+  - loadedCountryCode  (str)
+  - locationText  (str)
+  - manufacturerAttributes  (list)
+  - monthlyPurchaseVolume  (str)
+  - offers  (list)
+  - originalAsin  (str)
+  - price  (dict)
+  - priceRange  (None)
+  - productComparison  (None)
+  - productOverview  (list)
+  - productPageReviews  (list)
+  - productPageReviewsFromOtherCountries  (list)
+  - returnPolicy  (None)
+  - reviewsCount  (int)
+  - reviewsLink  (str)
+  - seller  (dict)
+  - shippingPrice  (None)
+  - stars  (float)
+  - starsBreakdown  (dict)
+  - support  (None)
+  - sustainabilityFeatures  (None)
+  - thumbnailImage  (str)
+  - title  (str)
+  - unNormalizedProductUrl  (str)
+  - url  (str)
+  - variantAsins  (list)
+  - variantAttributes  (list)
+  - variantDetails  (list)
+  - videosCount  (int)
+  - visitStoreLink  (dict)
+
+[ok] full raw item written to C:\Users\vibraca\OneDrive - Evolution Equities LLC\Personal\Business\(1) Claude\Claude Code\Social Media Scraper\amazon_crawler_discovery_raw.json

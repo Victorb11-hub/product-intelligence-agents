@@ -245,6 +245,14 @@ class AmazonAgent(BaseAgent):
             "ai_review_summary": pass2.get("ai_review_summary"),
             "ai_review_sentiment": pass2.get("ai_review_sentiment", 0),
             "review_velocity_monthly": pass2.get("review_velocity_monthly", 0),
+            # New AI topic + product enrichments
+            "ai_topic_breakdown": pass2.get("ai_topic_breakdown", []),
+            "brand": pass2.get("brand"),
+            "variant_count": pass2.get("variant_count", 0),
+            "category_path": pass2.get("category_path"),
+            "repeat_purchase_mentions": pass2.get("repeat_purchase_mentions", 0),
+            "repeat_purchase_signal": pass2.get("repeat_purchase_signal", False),
+            "repeat_topic_name": pass2.get("repeat_topic_name"),
             "out_of_stock_flag": False,
             "search_rank": 1,
         }
@@ -257,7 +265,10 @@ class AmazonAgent(BaseAgent):
                                  "two_star": 0, "one_star": 0},
                  "monthly_purchase_volume": 0,
                  "ai_review_summary": None, "ai_review_sentiment": 0,
-                 "review_velocity_monthly": 0}
+                 "review_velocity_monthly": 0,
+                 "ai_topic_breakdown": [], "brand": None, "variant_count": 0,
+                 "category_path": None,
+                 "repeat_purchase_mentions": 0, "repeat_purchase_signal": False}
         if not asin_urls:
             return empty
 
@@ -284,6 +295,10 @@ class AmazonAgent(BaseAgent):
         total_ratings_sum = 0
         total_monthly_volume = 0
         ai_summaries = []
+        ai_topics_all = []          # aggregated aiReviewsSummary.keywords across all products
+        brands_seen = []             # list of brand names from items
+        variant_counts = []          # len(variantAsins) per product
+        category_paths = []          # breadCrumbs strings
 
         for item in items:
             # BSR extraction
@@ -357,12 +372,50 @@ class AmazonAgent(BaseAgent):
             ai_summary = item.get("aiReviewsSummary") or {}
             if isinstance(ai_summary, dict):
                 summary_text = ai_summary.get("text") or ai_summary.get("summary") or ""
+                # Extract topic keywords array with sentiment + mention counts
+                keywords = ai_summary.get("keywords") or []
+                if isinstance(keywords, list):
+                    for topic in keywords:
+                        if not isinstance(topic, dict):
+                            continue
+                        mentions = topic.get("customersMentionedCount") or {}
+                        partial = topic.get("partialReviews") or []
+                        snippets = []
+                        for p in partial[:3]:
+                            if isinstance(p, dict):
+                                snippets.append({
+                                    "text": (p.get("text") or "")[:200],
+                                    "highlighted": (p.get("highlightedPart") or "")[:100],
+                                })
+                        ai_topics_all.append({
+                            "name": topic.get("name") or "",
+                            "sentiment": topic.get("sentiment") or "",
+                            "total_mentions": mentions.get("total", 0) if isinstance(mentions, dict) else 0,
+                            "positive_mentions": mentions.get("positive", 0) if isinstance(mentions, dict) else 0,
+                            "negative_mentions": mentions.get("negative", 0) if isinstance(mentions, dict) else 0,
+                            "snippets": snippets,
+                        })
             elif isinstance(ai_summary, str):
                 summary_text = ai_summary
             else:
                 summary_text = ""
             if summary_text:
                 ai_summaries.append(summary_text)
+
+            # Brand extraction (direct field — much cleaner than title parsing)
+            brand_val = item.get("brand") or ""
+            if brand_val and isinstance(brand_val, str):
+                brands_seen.append(brand_val.strip())
+
+            # Variant count — SKU depth proxy
+            variant_asins = item.get("variantAsins") or []
+            if isinstance(variant_asins, list):
+                variant_counts.append(len(variant_asins))
+
+            # Category path from breadcrumbs
+            breadcrumbs = item.get("breadCrumbs") or ""
+            if breadcrumbs and isinstance(breadcrumbs, str):
+                category_paths.append(breadcrumbs.strip())
 
             # Also check bestsellerRanks array (more detailed than single BSR)
             bsr_array = item.get("bestsellerRanks") or item.get("bestSellerRanks") or []
@@ -395,6 +448,75 @@ class AmazonAgent(BaseAgent):
         # Review velocity monthly estimate
         review_vel_monthly = total_ratings_sum / 12 if total_ratings_sum > 0 else 0
 
+        # Aggregate brand / variants / category
+        # Pick most common brand across products (mode), else first
+        brand = None
+        if brands_seen:
+            from collections import Counter
+            brand = Counter(brands_seen).most_common(1)[0][0]
+        avg_variant_count = int(sum(variant_counts) / len(variant_counts)) if variant_counts else 0
+        # Pick most common category path, else first
+        category_path = None
+        if category_paths:
+            from collections import Counter
+            category_path = Counter(category_paths).most_common(1)[0][0]
+
+        # ─── Repeat purchase detection ───
+        # Amazon AI topics are usually attribute-themed (Effectiveness, Moisturizing);
+        # repeat-purchase language actually lives inside the topic.partialReviews snippets.
+        # So we check BOTH: (1) topic names AND (2) snippet text.
+        repeat_keywords = [
+            "repurchas", "reorder", "restock", "again", "monthly", "regularly",
+            "always buy", "keep buying", "stock up", "subscribe", "staple",
+            "holy grail", "cant live without", "can't live without", "everyday",
+            "buy again", "ordering again", "ordering more", "buying more",
+            "for years", "many years", "been using", "keep ordering",
+        ]
+        repeat_topic = None
+        repeat_mentions = 0
+        snippet_hits = 0
+
+        # Pass 1: check topic names
+        for topic in ai_topics_all:
+            name_lower = (topic.get("name") or "").lower()
+            if any(kw in name_lower for kw in repeat_keywords):
+                mentions = topic.get("total_mentions", 0) or 0
+                if mentions > repeat_mentions:
+                    repeat_topic = topic.get("name")
+                    repeat_mentions = mentions
+
+        # Pass 2: scan snippet text inside all topics (catches behavior-themed language)
+        for topic in ai_topics_all:
+            for snip in topic.get("snippets", []):
+                text_lower = (snip.get("text") or "").lower()
+                if any(kw in text_lower for kw in repeat_keywords):
+                    snippet_hits += 1
+
+        repeat_signal = False
+        if repeat_topic and repeat_mentions > 0:
+            repeat_signal = True
+            logger.info("[amazon] Repeat purchase topic found: '%s' — %d mentions",
+                        repeat_topic, repeat_mentions)
+        elif snippet_hits > 0:
+            # Each snippet hit = ~20 review mentions (Amazon only shows 3 snippets per topic)
+            repeat_mentions = snippet_hits * 20
+            repeat_signal = True
+            logger.info("[amazon] Repeat purchase found in %d snippets — %d estimated mentions",
+                        snippet_hits, repeat_mentions)
+        else:
+            # Fall back to monthly_purchase_volume proxy (>= so "1K+ bought" registers)
+            if total_monthly_volume >= 10000:
+                repeat_mentions = 300
+                repeat_signal = True
+            elif total_monthly_volume >= 5000:
+                repeat_mentions = 150
+                repeat_signal = True
+            elif total_monthly_volume >= 1000:
+                repeat_mentions = 50
+                repeat_signal = True
+            logger.info("[amazon] No repeat topic/snippet found. Using monthly volume proxy: "
+                        "%d → %d estimated mentions", total_monthly_volume, repeat_mentions)
+
         logger.info("[amazon] Pass 2: BSR=%s, ratings=%d, monthly_vol=%d, "
                     "dist=[5★:%.0f%% 4★:%.0f%% 3★:%.0f%% 2★:%.0f%% 1★:%.0f%%], "
                     "ai_summaries=%d, ai_sentiment=%.2f",
@@ -412,6 +534,14 @@ class AmazonAgent(BaseAgent):
             "ai_review_summary": ai_summary_combined,
             "ai_review_sentiment": round(ai_sentiment, 4),
             "review_velocity_monthly": round(review_vel_monthly, 1),
+            # New enrichments
+            "ai_topic_breakdown": ai_topics_all,
+            "brand": brand,
+            "variant_count": avg_variant_count,
+            "category_path": category_path,
+            "repeat_purchase_mentions": repeat_mentions,
+            "repeat_purchase_signal": repeat_signal,
+            "repeat_topic_name": repeat_topic,  # for logging
         }
 
     def _fire_one_star_alert(self, product, current_pct, prev_pct, increase):
@@ -475,4 +605,11 @@ class AmazonAgent(BaseAgent):
             "ai_review_summary": raw_data.get("ai_review_summary"),
             "ai_review_sentiment": raw_data.get("ai_review_sentiment", 0),
             "review_velocity_monthly": raw_data.get("review_velocity_monthly", 0),
+            # New AI topic + product enrichments
+            "ai_topic_breakdown": raw_data.get("ai_topic_breakdown", []),
+            "brand": raw_data.get("brand"),
+            "variant_count": raw_data.get("variant_count", 0),
+            "category_path": raw_data.get("category_path"),
+            "repeat_purchase_mentions": raw_data.get("repeat_purchase_mentions", 0),
+            "repeat_purchase_signal": raw_data.get("repeat_purchase_signal", False),
         }
