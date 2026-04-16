@@ -410,13 +410,32 @@ class BaseAgent(ABC):
                 post_count += 1
 
                 # If this item is a comment (has parentId), also write to comments table
+                # Use the same expanded keyword lists + tie-break logic as score_comments()
+                # to keep flags consistent across scrape pipeline and re-scoring.
                 if data_type == "comment" and post_resp.data:
                     post_db_id = post_resp.data[0]["id"]
-                    c_lower = post_text.lower()
-
-                    buy_words = ["where to buy", "just bought", "ordered", "link", "which brand", "recommend", "best brand"]
-                    problem_words = ["doesn't work", "scam", "waste", "side effect", "dangerous", "fake", "problem"]
-                    repeat_words = ["been using", "on my second", "on my third", "repurchased", "daily routine", "monthly"]
+                    # Lazy-import to avoid circular dependency
+                    from .base_platform_agent import (
+                        PURCHASE_SIGNALS, NEGATIVE_SIGNALS,
+                        EMOJI_PURCHASE, EMOJI_NEGATIVE,
+                        _normalize_text, _count_emojis,
+                    )
+                    normalized = _normalize_text(post_text)
+                    purchase_matches = sum(1 for w in PURCHASE_SIGNALS if w in normalized)
+                    negative_matches = sum(1 for w in NEGATIVE_SIGNALS if w in normalized)
+                    purchase_matches += _count_emojis(post_text, EMOJI_PURCHASE)
+                    negative_matches += _count_emojis(post_text, EMOJI_NEGATIVE)
+                    # Priority: tie → purchase
+                    is_buy = is_neg = False
+                    if purchase_matches > 0 or negative_matches > 0:
+                        if purchase_matches >= negative_matches:
+                            is_buy = True
+                        else:
+                            is_neg = True
+                    repeat_words = ["been using", "on my second", "on my third", "repurchased",
+                                    "daily routine", "monthly", "restocked", "holy grail",
+                                    "keep buying", "buying again"]
+                    is_repeat = any(w in normalized for w in repeat_words)
 
                     self.supabase.table("comments").insert({
                         "post_id": post_db_id,
@@ -427,9 +446,9 @@ class BaseAgent(ABC):
                         "upvotes": item.get("score") or 0,
                         "intent_level": item_intent["intent_level"],
                         "sentiment_score": item_sentiment["sentiment_score"],
-                        "is_buy_intent": any(w in c_lower for w in buy_words),
-                        "is_problem_language": any(w in c_lower for w in problem_words),
-                        "is_repeat_purchase": any(w in c_lower for w in repeat_words),
+                        "is_buy_intent": is_buy,
+                        "is_problem_language": is_neg,
+                        "is_repeat_purchase": is_repeat,
                         "posted_at": item.get("createdAt") or None,
                     }).execute()
                     comment_count += 1

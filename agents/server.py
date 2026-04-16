@@ -316,6 +316,7 @@ async def scheduler_status():
     try:
         supabase = get_supabase()
         runs_resp = supabase.table("pipeline_runs").select("*") \
+            .eq("phase", "full_pipeline") \
             .order("started_at", desc=True).limit(1).execute()
         if runs_resp.data:
             r = runs_resp.data[0]
@@ -323,6 +324,7 @@ async def scheduler_status():
             base["last_run_status"] = r.get("status")
             base["last_run_duration_seconds"] = r.get("duration_seconds")
         completed_resp = supabase.table("pipeline_runs").select("id") \
+            .eq("phase", "full_pipeline") \
             .eq("status", "completed").execute()
         base["total_runs_completed"] = len(completed_resp.data or [])
     except Exception as e:

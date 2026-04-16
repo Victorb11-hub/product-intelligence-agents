@@ -384,19 +384,20 @@ class BasePlatformAgent(BaseAgent):
             weighted_intents.append(i["intent_score"] * total_weight)
             weighted_sentiments.append(s["sentiment_score"] * total_weight)
 
-            # Keyword-based signal detection (on normalized text)
-            is_purchase = any(w in normalized for w in PURCHASE_SIGNALS)
-            is_negative = any(w in normalized for w in NEGATIVE_SIGNALS)
-            is_question = any(w in normalized for w in QUESTION_SIGNALS)
+            # Keyword-based signal detection — COUNT matches per category
+            # (was: any() returning bool; now: sum() returning int for priority resolution)
+            purchase_matches = sum(1 for w in PURCHASE_SIGNALS if w in normalized)
+            negative_matches = sum(1 for w in NEGATIVE_SIGNALS if w in normalized)
+            question_matches = sum(1 for w in QUESTION_SIGNALS if w in normalized)
             is_neutral_high = any(w in normalized for w in NEUTRAL_HIGH_INTENT_SIGNALS)
 
-            # Phrase proximity matching
+            # Phrase proximity matching adds to match counts
             for w1, w2, dist, sig_type in PROXIMITY_PAIRS:
                 if _check_proximity(words, w1, w2, dist):
                     if sig_type == "purchase":
-                        is_purchase = True
+                        purchase_matches += 1
                     elif sig_type == "negative":
-                        is_negative = True
+                        negative_matches += 1
 
             # Emoji detection (on raw text — preserves emoji)
             ep = _count_emojis(raw_body, EMOJI_PURCHASE)
@@ -408,13 +409,21 @@ class BasePlatformAgent(BaseAgent):
             emoji_negative_count += en
             emoji_question_count += eq
 
-            # Emoji can also flip a comment to a signal type
-            if ep > 0:
-                is_purchase = True
-            if en > 0:
-                is_negative = True
-            if eq > 0:
-                is_question = True
+            # Emoji adds to match counts (purchase/negative/question)
+            purchase_matches += ep
+            negative_matches += en
+            question_matches += eq
+
+            # PRIORITY RULE: when both purchase and negative matches exist,
+            # whichever has more matches wins. Tie → purchase (benefit of doubt).
+            is_purchase = False
+            is_negative = False
+            is_question = question_matches > 0
+            if purchase_matches > 0 or negative_matches > 0:
+                if purchase_matches >= negative_matches:
+                    is_purchase = True
+                else:
+                    is_negative = True
 
             if is_purchase:
                 purchase_count += 1

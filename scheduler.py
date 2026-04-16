@@ -401,9 +401,12 @@ def run_full_pipeline():
         else int(os.environ.get("LOOKBACK_DAYS_WEEKLY", "7"))
 
     # Insert pipeline_runs row at start
+    # Note: legacy schema has `phase` NOT NULL — use "full_pipeline" sentinel
+    # for the orchestrator-level row (per-phase rows still use specific phase names)
     pipeline_run_id = None
     try:
         run_row = db.table("pipeline_runs").insert({
+            "phase": "full_pipeline",
             "run_type": run_type,
             "status": "running",
             "started_at": pipeline_start.isoformat(),
@@ -412,6 +415,7 @@ def run_full_pipeline():
         }).execute()
         if run_row.data:
             pipeline_run_id = run_row.data[0].get("id")
+            logger.info("[pipeline_runs] Started run %s (type=%s)", pipeline_run_id, run_type)
     except Exception as e:
         logger.warning("Failed to write pipeline_runs start row: %s", e)
 
@@ -420,6 +424,7 @@ def run_full_pipeline():
         try:
             six_hours_ago = (datetime.now() - timedelta(hours=6)).isoformat()
             recent = db.table("pipeline_runs").select("id") \
+                .eq("phase", "full_pipeline") \
                 .eq("status", "completed") \
                 .gte("completed_at", six_hours_ago).limit(1).execute()
             if recent.data:
