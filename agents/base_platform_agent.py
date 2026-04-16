@@ -314,6 +314,88 @@ class BasePlatformAgent(BaseAgent):
         """Return the UTC datetime cutoff for the lookback window."""
         return datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
+    # ─── Pass 2 tiering — scale comment limits by post engagement ───
+
+    def compute_comment_tiers(self, top_posts: list[dict], engagement_fn) -> dict:
+        """
+        Split top_posts into 3 tiers by engagement and return per-post comment limits.
+
+        Args:
+            top_posts: list of post dicts from Pass 1
+            engagement_fn: callable(post_dict) -> float (platform-specific engagement score)
+
+        Returns:
+            {
+                "tier1": [posts...],  # top X% — highest engagement
+                "tier2": [posts...],  # next Y%
+                "tier3": [posts...],  # remaining
+                "tier1_limit": int,  "tier2_limit": int,  "tier3_limit": int,
+                "total_limit": int,  # sum across all posts of limits assigned
+                "breakdown": { "tier1_posts": N, ... },  # for signal row audit
+            }
+        """
+        tiers_enabled = _env_int("PASS2_TIERS_ENABLED", 1) == 1
+        tier1_limit = _env_int("PASS2_COMMENTS_TIER1", 1000)
+        tier2_limit = _env_int("PASS2_COMMENTS_TIER2", 500)
+        tier3_limit = _env_int("PASS2_COMMENTS_TIER3", 200)
+        tier1_thresh = _env_float("PASS2_TIER1_THRESHOLD", 0.10)
+        tier2_thresh = _env_float("PASS2_TIER2_THRESHOLD", 0.30)
+
+        # If tiering disabled, everyone gets the flat limit
+        if not tiers_enabled:
+            flat_limit = _env_int("PASS2_COMMENTS_PER_POST", 50)
+            return {
+                "tier1": [], "tier2": [],
+                "tier3": list(top_posts),
+                "tier1_limit": 0, "tier2_limit": 0, "tier3_limit": flat_limit,
+                "total_limit": flat_limit * len(top_posts),
+                "breakdown": {
+                    "tier1_posts": 0, "tier2_posts": 0, "tier3_posts": len(top_posts),
+                    "tier1_limit": 0, "tier2_limit": 0, "tier3_limit": flat_limit,
+                    "total_limit": flat_limit * len(top_posts),
+                    "tiers_enabled": False,
+                },
+            }
+
+        if not top_posts:
+            return {
+                "tier1": [], "tier2": [], "tier3": [],
+                "tier1_limit": tier1_limit, "tier2_limit": tier2_limit, "tier3_limit": tier3_limit,
+                "total_limit": 0,
+                "breakdown": {"tier1_posts": 0, "tier2_posts": 0, "tier3_posts": 0,
+                              "total_limit": 0, "tiers_enabled": True},
+            }
+
+        # Sort posts by engagement score descending
+        sorted_posts = sorted(top_posts, key=engagement_fn, reverse=True)
+        n = len(sorted_posts)
+        tier1_count = max(1, int(n * tier1_thresh))  # at least 1 post in top tier if any
+        tier2_count = max(0, int(n * tier2_thresh) - tier1_count)
+
+        tier1 = sorted_posts[:tier1_count]
+        tier2 = sorted_posts[tier1_count:tier1_count + tier2_count]
+        tier3 = sorted_posts[tier1_count + tier2_count:]
+
+        total_limit = (len(tier1) * tier1_limit +
+                       len(tier2) * tier2_limit +
+                       len(tier3) * tier3_limit)
+
+        breakdown = {
+            "tier1_posts": len(tier1), "tier1_limit": tier1_limit,
+            "tier2_posts": len(tier2), "tier2_limit": tier2_limit,
+            "tier3_posts": len(tier3), "tier3_limit": tier3_limit,
+            "total_limit": total_limit, "tiers_enabled": True,
+        }
+
+        logger.info("[%s][pass2 tiers] %d top + %d mid + %d base = total %d comment cap",
+                    self.PLATFORM, len(tier1), len(tier2), len(tier3), total_limit)
+
+        return {
+            "tier1": tier1, "tier2": tier2, "tier3": tier3,
+            "tier1_limit": tier1_limit, "tier2_limit": tier2_limit, "tier3_limit": tier3_limit,
+            "total_limit": total_limit, "breakdown": breakdown,
+        }
+
     # ─── Pass 1 & 2 (subclasses implement) ───
 
     @abstractmethod

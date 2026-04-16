@@ -60,16 +60,18 @@ class RedditAgent(BasePlatformAgent):
             return self._empty_result(product, subreddits, len(pass1_items), time.time() - start)
 
         # ═══════════════════════════════════════
-        # PASS 2 — Deep comments on winners
+        # PASS 2 — Deep comments on winners (tiered by engagement)
         # ═══════════════════════════════════════
-        post_urls = [p.get("url") or f"https://www.reddit.com{p.get('permalink', '')}" for p in top_posts]
-        post_urls = [u for u in post_urls if u and "reddit.com" in u]
+        # Keep full post dicts so we can tier them by upvotes × log10(comments+1)
+        posts_for_pass2 = [p for p in top_posts
+                           if p.get("url") or p.get("permalink")]
 
         try:
-            comments = self.run_pass2(post_urls, product)
+            comments, tier_breakdown = self.run_pass2(posts_for_pass2, product)
         except Exception as e:
             logger.error("[reddit] Pass 2 FAILED: %s", str(e)[:300])
             comments = []
+            tier_breakdown = {}
 
         # Score comments with parent virality weighting
         all_scored = []
@@ -173,6 +175,9 @@ class RedditAgent(BasePlatformAgent):
             "growth_rate_wow": 0,
             "creator_tier_score": 0,
             "repeat_purchase_pct": 0,
+            # Pass 2 tier audit
+            "pass2_tier_breakdown": tier_breakdown,
+            "pass2_total_comment_limit": tier_breakdown.get("total_limit", 0),
         }
 
     # ─── Pass 1: Metadata discovery ───
@@ -282,50 +287,76 @@ class RedditAgent(BasePlatformAgent):
 
     # ─── Pass 2: Deep comments ───
 
-    def run_pass2(self, top_posts: list[dict], product: dict) -> list[dict]:
-        """Pull full comment threads from top posts."""
-        # top_posts here is actually post URLs (list of strings)
-        post_urls = top_posts if isinstance(top_posts[0], str) else [
-            p.get("url") or f"https://www.reddit.com{p.get('permalink', '')}" for p in top_posts
-        ]
+    def run_pass2(self, top_posts: list[dict], product: dict):
+        """Pull full comment threads from top posts using tiered batching.
+        Returns (comments, tier_breakdown). Splits posts by engagement into 3 tiers;
+        each tier gets its own actor call with a proportional maxItems budget."""
+        if not top_posts:
+            return [], {}
+
+        # Reddit engagement = upvotes × log10(num_comments + 1) — discussion density
+        def eng(p):
+            upvotes = p.get("score") or p.get("upVotes") or p.get("ups") or 0
+            cmts = p.get("num_comments") or p.get("numComments") or p.get("numberOfComments") or 0
+            return upvotes * math.log10(cmts + 1)
+
+        tiers = self.compute_comment_tiers(top_posts, eng)
 
         timeout = _env_int("REDDIT_PASS2_TIMEOUT", 300)
-        max_items = _env_int("REDDIT_PASS2_MAX_ITEMS", 1000)
+        all_comments = []
 
-        logger.info("[reddit pass2] Fetching comments from %d posts", len(post_urls))
+        for tier_name, posts, per_post_limit in [
+            ("tier1", tiers["tier1"], tiers["tier1_limit"]),
+            ("tier2", tiers["tier2"], tiers["tier2_limit"]),
+            ("tier3", tiers["tier3"], tiers["tier3_limit"]),
+        ]:
+            if not posts:
+                continue
+            urls = [p.get("url") or f"https://www.reddit.com{p.get('permalink', '')}" for p in posts]
+            urls = [u for u in urls if u and "reddit.com" in u]
+            if not urls:
+                continue
 
-        try:
-            items = run_actor(
-                actor_id=APIFY_ACTORS.get("reddit_p2", APIFY_ACTORS.get("reddit")),
-                run_input={
-                    "startUrls": [{"url": u} for u in post_urls],
-                    "skipComments": False,
-                    "maxItems": max_items,
-                    "proxy": {"useApifyProxy": True},
-                },
-                api_token=APIFY_API_TOKEN,
-                timeout_secs=timeout,
-                max_items=max_items + 200,
-            )
-        except Exception as e:
-            logger.error("[reddit pass2] Actor failed: %s", str(e)[:300])
-            raise
+            # Reddit actor uses global maxItems — multiply per-post limit × post count
+            # Add 200 headroom for post rows mixed in with comment rows
+            tier_max = per_post_limit * len(urls) + 200
 
-        # Separate comments from posts
-        comments = []
-        for item in items:
-            is_comment = (
-                item.get("dataType") == "comment" or
-                item.get("type") == "comment" or
-                item.get("parentId") is not None or
-                (item.get("body") and not item.get("title"))
-            )
-            if is_comment:
-                comments.append(item)
+            logger.info("[reddit pass2][%s] Fetching comments from %d posts (max %d total)",
+                        tier_name, len(urls), tier_max)
 
-        logger.info("[reddit pass2] %d total items, %d identified as comments",
-                    len(items), len(comments))
-        return comments
+            try:
+                items = run_actor(
+                    actor_id=APIFY_ACTORS.get("reddit_p2", APIFY_ACTORS.get("reddit")),
+                    run_input={
+                        "startUrls": [{"url": u} for u in urls],
+                        "skipComments": False,
+                        "maxItems": tier_max,
+                        "proxy": {"useApifyProxy": True},
+                    },
+                    api_token=APIFY_API_TOKEN,
+                    timeout_secs=timeout,
+                    max_items=tier_max + 100,
+                )
+                tier_comments = []
+                for item in items:
+                    is_comment = (
+                        item.get("dataType") == "comment" or
+                        item.get("type") == "comment" or
+                        item.get("parentId") is not None or
+                        (item.get("body") and not item.get("title"))
+                    )
+                    if is_comment:
+                        tier_comments.append(item)
+                all_comments.extend(tier_comments)
+                logger.info("[reddit pass2][%s] %d items returned, %d comments",
+                            tier_name, len(items), len(tier_comments))
+            except Exception as e:
+                logger.error("[reddit pass2][%s] Actor failed: %s", tier_name, str(e)[:300])
+
+        logger.info("[reddit pass2] TOTAL: %d comments across %d tiers",
+                    len(all_comments), sum(1 for t in ("tier1", "tier2", "tier3") if tiers[t]))
+
+        return all_comments, tiers["breakdown"]
 
     # ─── Signal row builder ───
 
@@ -353,6 +384,8 @@ class RedditAgent(BasePlatformAgent):
             "weighted_sentiment": raw_data.get("weighted_sentiment", 0),
             "lookback_days": _env_int("REDDIT_LOOKBACK_DAYS", 90),
             "is_backfill": False,
+            "pass2_tier_breakdown": raw_data.get("pass2_tier_breakdown"),
+            "pass2_total_comment_limit": raw_data.get("pass2_total_comment_limit", 0),
         }
 
     # ─── Helper methods ───
@@ -369,6 +402,7 @@ class RedditAgent(BasePlatformAgent):
             "duration_seconds": round(elapsed, 1), "error": error_msg,
             "buy_intent_comment_count": 0, "problem_language_comment_count": 0,
             "growth_rate_wow": 0, "creator_tier_score": 0, "repeat_purchase_pct": 0,
+            "pass2_tier_breakdown": {}, "pass2_total_comment_limit": 0,
         }
 
     def _empty_result(self, product, subreddits, total_found, elapsed):

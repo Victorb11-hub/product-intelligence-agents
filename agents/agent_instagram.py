@@ -75,16 +75,17 @@ class InstagramAgent(BasePlatformAgent):
         total_comments_count = sum(p.get("commentsCount") or 0 for p in top_posts)
 
         # ═══════════════════════════════════════
-        # PASS 2 — Deep comments on winners
+        # PASS 2 — Deep comments on winners (tiered by engagement)
         # ═══════════════════════════════════════
         # Only fetch comments for posts that actually have comments
-        post_urls = [p.get("url") for p in top_posts if p.get("url") and (p.get("commentsCount") or 0) > 0]
+        posts_for_pass2 = [p for p in top_posts if p.get("url") and (p.get("commentsCount") or 0) > 0]
 
         try:
-            comments = self.run_pass2(post_urls, product) if post_urls else []
+            comments, tier_breakdown = (self.run_pass2(posts_for_pass2, product) if posts_for_pass2 else ([], {}))
         except Exception as e:
             logger.error("[instagram] Pass 2 FAILED: %s", str(e)[:300])
             comments = []
+            tier_breakdown = {}
 
         # Score comments grouped by parent post (using postUrl as join key)
         all_scored = []
@@ -180,6 +181,9 @@ class InstagramAgent(BasePlatformAgent):
             "problem_language_comment_count": total_stats["negative_signal_count"],
             "growth_rate_wow": 0,
             "repeat_purchase_pct": 0,
+            # Pass 2 tier audit
+            "pass2_tier_breakdown": tier_breakdown,
+            "pass2_total_comment_limit": tier_breakdown.get("total_limit", 0),
         }
 
     # ─── Pass 1: Metadata discovery ───
@@ -283,48 +287,62 @@ class InstagramAgent(BasePlatformAgent):
 
     # ─── Pass 2: Deep comments ───
 
-    def run_pass2(self, top_posts: list[dict], product: dict) -> list[dict]:
-        """Pull comments from top posts using dedicated comment scraper."""
-        post_urls = top_posts if isinstance(top_posts[0], str) else [
-            p.get("url") for p in top_posts if p.get("url")
-        ]
-        post_urls = [u for u in post_urls if u]
+    def run_pass2(self, top_posts: list[dict], product: dict):
+        """Pull comments from top posts. Returns (comments, tier_breakdown).
+        Uses tiered comment limits based on engagement — makes up to 3 actor calls."""
+        if not top_posts:
+            return [], {}
 
-        if not post_urls:
-            return []
+        # Instagram engagement = likes + comments (no view count available from hashtag scraper)
+        def eng(p):
+            return (p.get("likesCount") or 0) + (p.get("commentsCount") or 0)
 
-        comments_per = _env_int("PASS2_COMMENTS_PER_POST", 50)
+        tiers = self.compute_comment_tiers(top_posts, eng)
+
         timeout = _env_int("INSTAGRAM_PASS2_TIMEOUT", 300)
-        max_items = _env_int("INSTAGRAM_PASS2_MAX_ITEMS", 1500)
+        all_comments = []
 
-        logger.info("[instagram pass2] Fetching comments from %d posts (%d max/post)",
-                    len(post_urls), comments_per)
+        for tier_name, posts, per_post_limit in [
+            ("tier1", tiers["tier1"], tiers["tier1_limit"]),
+            ("tier2", tiers["tier2"], tiers["tier2_limit"]),
+            ("tier3", tiers["tier3"], tiers["tier3_limit"]),
+        ]:
+            if not posts:
+                continue
+            urls = [p.get("url") for p in posts if p.get("url")]
+            if not urls:
+                continue
 
-        try:
-            items = run_actor(
-                actor_id=APIFY_ACTORS["instagram_comments"],
-                run_input={
-                    "directUrls": post_urls,
-                    "resultsLimit": comments_per,
-                },
-                api_token=APIFY_API_TOKEN,
-                timeout_secs=timeout,
-                max_items=max_items,
-            )
-        except Exception as e:
-            logger.error("[instagram pass2] Actor failed: %s", str(e)[:300])
-            raise
+            max_items = per_post_limit * len(urls) + 100
 
-        # Filter out error placeholder rows AND items without text
-        comments = [item for item in items if item.get("text") and not item.get("error")]
+            logger.info("[instagram pass2][%s] Fetching comments from %d posts (%d/post max)",
+                        tier_name, len(urls), per_post_limit)
 
-        unavailable = [i for i in items if i.get("error")]
-        for u in unavailable:
-            logger.info("[instagram] Post unavailable: %s. Skipping.", u.get("url") or u.get("inputUrl"))
+            try:
+                items = run_actor(
+                    actor_id=APIFY_ACTORS["instagram_comments"],
+                    run_input={
+                        "directUrls": urls,
+                        "resultsLimit": per_post_limit,
+                    },
+                    api_token=APIFY_API_TOKEN,
+                    timeout_secs=timeout,
+                    max_items=max_items,
+                )
+                valid = [item for item in items if item.get("text") and not item.get("error")]
+                unavailable = [i for i in items if i.get("error")]
+                for u in unavailable:
+                    logger.info("[instagram] Post unavailable: %s", u.get("url") or u.get("inputUrl"))
+                all_comments.extend(valid)
+                logger.info("[instagram pass2][%s] %d items returned, %d valid, %d unavailable",
+                            tier_name, len(items), len(valid), len(unavailable))
+            except Exception as e:
+                logger.error("[instagram pass2][%s] Actor failed: %s", tier_name, str(e)[:300])
 
-        logger.info("[instagram pass2] %d items returned, %d valid comments, %d unavailable posts",
-                    len(items), len(comments), len(unavailable))
-        return comments
+        logger.info("[instagram pass2] TOTAL: %d valid comments across %d tiers",
+                    len(all_comments), sum(1 for t in ("tier1", "tier2", "tier3") if tiers[t]))
+
+        return all_comments, tiers["breakdown"]
 
     # ─── Helpers ───
 
@@ -357,6 +375,8 @@ class InstagramAgent(BasePlatformAgent):
             "weighted_sentiment": raw_data.get("weighted_sentiment", 0),
             "lookback_days": self.get_lookback_days({"backfill_completed": True}),
             "is_backfill": False,
+            "pass2_tier_breakdown": raw_data.get("pass2_tier_breakdown"),
+            "pass2_total_comment_limit": raw_data.get("pass2_total_comment_limit", 0),
         }
 
     def _error_result(self, hashtags, error_msg, elapsed):
@@ -374,6 +394,7 @@ class InstagramAgent(BasePlatformAgent):
             "creator_tier_score": 0.5, "buy_intent_comment_count": 0,
             "problem_language_comment_count": 0, "growth_rate_wow": 0,
             "repeat_purchase_pct": 0,
+            "pass2_tier_breakdown": {}, "pass2_total_comment_limit": 0,
         }
 
     def _empty_result(self, hashtags, total_found, elapsed):

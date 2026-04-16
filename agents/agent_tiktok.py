@@ -87,16 +87,16 @@ class TikTokAgent(BasePlatformAgent):
         avg_creator = sum(creator_scores) / max(len(creator_scores), 1) if creator_scores else 0.3
 
         # ═══════════════════════════════════════
-        # PASS 2 — Deep comments on winners
+        # PASS 2 — Deep comments on winners (tiered by engagement)
         # ═══════════════════════════════════════
-        post_urls = [p.get("webVideoUrl") or "" for p in top_posts]
-        post_urls = [u for u in post_urls if u]
+        posts_with_urls = [p for p in top_posts if p.get("webVideoUrl")]
 
         try:
-            comments = self.run_pass2(post_urls, product)
+            comments, tier_breakdown = self.run_pass2(posts_with_urls, product)
         except Exception as e:
             logger.error("[tiktok] Pass 2 FAILED: %s", str(e)[:300])
             comments = []
+            tier_breakdown = {}
 
         # Score comments with parent virality weighting
         all_scored = []
@@ -194,6 +194,9 @@ class TikTokAgent(BasePlatformAgent):
             "growth_rate_wow": 0,
             "avg_view_velocity": 0,
             "repeat_purchase_pct": 0,
+            # Pass 2 tier audit
+            "pass2_tier_breakdown": tier_breakdown,
+            "pass2_total_comment_limit": tier_breakdown.get("total_limit", 0),
         }
 
     # ─── Pass 1: Metadata discovery (no comments) ───
@@ -291,46 +294,63 @@ class TikTokAgent(BasePlatformAgent):
 
     # ─── Pass 2: Deep comments on winners ───
 
-    def run_pass2(self, top_posts: list[dict], product: dict) -> list[dict]:
-        """Pull comments from top videos using dedicated comments actor."""
-        post_urls = top_posts if isinstance(top_posts[0], str) else [
-            p.get("webVideoUrl") or "" for p in top_posts
-        ]
-        post_urls = [u for u in post_urls if u]
+    def run_pass2(self, top_posts: list[dict], product: dict):
+        """Pull comments from top videos. Returns (comments, tier_breakdown).
+        Uses tiered comment limits based on engagement — makes up to 3 actor calls."""
+        if not top_posts:
+            return [], {}
 
-        if not post_urls:
-            return []
+        # TikTok engagement = views (playCount)
+        def eng(p):
+            return p.get("playCount") or 0
 
-        comments_per = _env_int("PASS2_COMMENTS_PER_POST", 50)
+        tiers = self.compute_comment_tiers(top_posts, eng)
+
         replies_per = _env_int("PASS2_REPLIES_PER_COMMENT", 10)
         timeout = _env_int("TIKTOK_PASS2_TIMEOUT", 300)
-        max_items = _env_int("TIKTOK_PASS2_MAX_ITEMS", 1500)
 
-        logger.info("[tiktok pass2] Fetching comments from %d videos (%d comments/post)",
-                    len(post_urls), comments_per)
+        all_comments = []
 
-        try:
-            items = run_actor(
-                actor_id=APIFY_ACTORS["tiktok_comments"],
-                run_input={
-                    "postURLs": post_urls,
-                    "commentsPerPost": comments_per,
-                    "maxRepliesPerComment": replies_per,
-                },
-                api_token=APIFY_API_TOKEN,
-                timeout_secs=timeout,
-                max_items=max_items,
-            )
-        except Exception as e:
-            logger.error("[tiktok pass2] Actor failed: %s", str(e)[:300])
-            raise
+        for tier_name, posts, per_post_limit in [
+            ("tier1", tiers["tier1"], tiers["tier1_limit"]),
+            ("tier2", tiers["tier2"], tiers["tier2_limit"]),
+            ("tier3", tiers["tier3"], tiers["tier3_limit"]),
+        ]:
+            if not posts:
+                continue
+            urls = [p.get("webVideoUrl") for p in posts if p.get("webVideoUrl")]
+            if not urls:
+                continue
 
-        # All items from tiktok-comments-scraper are comments (skip errors)
-        comments = [item for item in items if item.get("text") and not item.get("error")]
+            # max_items = per-post limit × number of posts + headroom
+            max_items = per_post_limit * len(urls) + 100
 
-        logger.info("[tiktok pass2] %d items returned, %d valid comments",
-                    len(items), len(comments))
-        return comments
+            logger.info("[tiktok pass2][%s] Fetching comments from %d videos (%d/post max)",
+                        tier_name, len(urls), per_post_limit)
+
+            try:
+                items = run_actor(
+                    actor_id=APIFY_ACTORS["tiktok_comments"],
+                    run_input={
+                        "postURLs": urls,
+                        "commentsPerPost": per_post_limit,
+                        "maxRepliesPerComment": replies_per,
+                    },
+                    api_token=APIFY_API_TOKEN,
+                    timeout_secs=timeout,
+                    max_items=max_items,
+                )
+                valid = [item for item in items if item.get("text") and not item.get("error")]
+                all_comments.extend(valid)
+                logger.info("[tiktok pass2][%s] %d items returned, %d valid", tier_name, len(items), len(valid))
+            except Exception as e:
+                logger.error("[tiktok pass2][%s] Actor failed: %s", tier_name, str(e)[:300])
+                # Continue with other tiers — one failure doesn't kill the whole pass
+
+        logger.info("[tiktok pass2] TOTAL: %d valid comments across %d tiers",
+                    len(all_comments), sum(1 for t in ("tier1", "tier2", "tier3") if tiers[t]))
+
+        return all_comments, tiers["breakdown"]
 
     # ─── Signal row builder ───
 
@@ -359,6 +379,8 @@ class TikTokAgent(BasePlatformAgent):
             "weighted_sentiment": raw_data.get("weighted_sentiment", 0),
             "lookback_days": self.get_lookback_days({"backfill_completed": True}),
             "is_backfill": False,
+            "pass2_tier_breakdown": raw_data.get("pass2_tier_breakdown"),
+            "pass2_total_comment_limit": raw_data.get("pass2_total_comment_limit", 0),
         }
 
     # ─── Helpers ───
@@ -377,6 +399,7 @@ class TikTokAgent(BasePlatformAgent):
             "creator_tier_score": 0, "buy_intent_comment_count": 0,
             "problem_language_comment_count": 0, "growth_rate_wow": 0,
             "avg_view_velocity": 0, "repeat_purchase_pct": 0,
+            "pass2_tier_breakdown": {}, "pass2_total_comment_limit": 0,
         }
 
     def _empty_result(self, hashtags, total_found, elapsed):
