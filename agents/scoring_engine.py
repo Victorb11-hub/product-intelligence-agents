@@ -3,11 +3,57 @@ Scoring Engine — Runs after all scrapers complete.
 Computes 4-job weighted composite score with recency weighting.
 Writes to scores_history and product_snapshots.
 """
+import os
 import math
 import logging
 from datetime import date, datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+def _env_float(key, default):
+    try: return float(os.environ.get(key, default))
+    except (ValueError, TypeError): return float(default)
+
+def _env_int(key, default):
+    try: return int(os.environ.get(key, default))
+    except (ValueError, TypeError): return int(default)
+
+
+def _purchase_signal_norm(count: int, platform_prefix: str) -> float:
+    """Convert purchase_signal_count to 0-100 score using tier env vars."""
+    t1 = _env_int(f"{platform_prefix}_PURCHASE_TIER_1", 5)
+    t2 = _env_int(f"{platform_prefix}_PURCHASE_TIER_2", 20)
+    t3 = _env_int(f"{platform_prefix}_PURCHASE_TIER_3", 50)
+    t4 = _env_int(f"{platform_prefix}_PURCHASE_TIER_4", 100)
+    if count <= 0: return 0
+    if count <= t1: return 20
+    if count <= t2: return 40
+    if count <= t3: return 60
+    if count <= t4: return 80
+    return 100
+
+
+def _negative_penalty(purchase_count: int, negative_count: int) -> float:
+    """Compute penalty multiplier based on negative/purchase ratio."""
+    if purchase_count <= 0:
+        return 1.0  # No baseline to compare against
+    ratio = negative_count / purchase_count
+    if ratio > _env_float("NEGATIVE_RATIO_SEVERE", 0.50):
+        return _env_float("NEGATIVE_PENALTY_SEVERE", 0.70)
+    if ratio > _env_float("NEGATIVE_RATIO_MODERATE", 0.25):
+        return _env_float("NEGATIVE_PENALTY_MODERATE", 0.85)
+    if ratio > _env_float("NEGATIVE_RATIO_MILD", 0.10):
+        return _env_float("NEGATIVE_PENALTY_MILD", 0.95)
+    return 1.0
+
+
+def _assert_weights_sum_to_one(weights: dict, label: str):
+    """Log warning if weights don't sum to 1.0."""
+    total = sum(weights.values())
+    if abs(total - 1.0) > 0.01:
+        logger.warning("[scoring] %s weights sum to %.3f, not 1.0 — normalizing", label, total)
+        return {k: v / total for k, v in weights.items()}
+    return weights
 
 # Default settings — overridden by scoring_settings table in Supabase
 _settings_cache = None
@@ -82,7 +128,6 @@ def _score_product(db, product, run_id):
     j1_parts = {}
     if tiktok:
         mentions = tiktok.get("mention_count", 0) or 0
-        # Fallback: if signal shows 0 mentions, check posts table directly
         if mentions == 0:
             try:
                 pc = db.table("posts").select("id").eq("product_id", pid).eq("platform", "tiktok").execute()
@@ -90,29 +135,46 @@ def _score_product(db, product, run_id):
             except Exception:
                 pass
         likes = tiktok.get("total_upvotes", 0) or 0
-        comments = tiktok.get("total_comment_count", 0) or 0
-        creator = tiktok.get("creator_tier_score", 0.3) or 0.3
-        # View velocity — read total_views from signal row directly
+        comments_raw = tiktok.get("total_comment_count", 0) or 0
         total_views = tiktok.get("total_views", 0) or 0
-        views_per_post = total_views / max(mentions, 1)
-        # Normalize view velocity (views per post) to 0-100
-        if views_per_post > 500_000: vel_norm = 90
-        elif views_per_post > 100_000: vel_norm = 75
-        elif views_per_post > 10_000: vel_norm = 60
-        elif views_per_post > 1_000: vel_norm = 40
-        else: vel_norm = 20
-        # Creator tier to 0-100
-        creator_norm = creator * 100
-        # Engagement rate
-        eng_rate = (likes + comments) / max(total_views, 1) * 100 if total_views > 0 else 30
-        eng_norm = min(100, eng_rate * 10)  # Scale up (IG/TT rates are low single digits)
 
-        tiktok_sub = vel_norm * 0.40 + creator_norm * 0.30 + eng_norm * 0.30
+        # Engagement rate norm (log scale)
+        avg_engagement = (likes + comments_raw) / max(mentions, 1)
+        engagement_rate_norm = min(100, max(0, math.log10(max(avg_engagement, 1)) * 15))
+
+        # Weighted comment intent (from Pass 2 — already 0-1, scale to 0-100)
+        tt_intent = (tiktok.get("weighted_comment_intent") or
+                     tiktok.get("avg_intent_score", 0) or 0) * 100
+        tt_intent_norm = min(100, max(0, tt_intent))
+
+        # Purchase signal normalization (tier-based)
+        tt_purchase_count = tiktok.get("purchase_signal_count", 0) or 0
+        tt_negative_count = tiktok.get("negative_signal_count", 0) or 0
+        tt_purchase_norm = _purchase_signal_norm(tt_purchase_count, "TIKTOK")
+
+        # Weights from env (must sum to 1.0)
+        w = _assert_weights_sum_to_one({
+            "intent": _env_float("TIKTOK_WEIGHT_INTENT", 0.45),
+            "purchase": _env_float("TIKTOK_WEIGHT_PURCHASE", 0.25),
+            "engagement": _env_float("TIKTOK_WEIGHT_ENGAGEMENT", 0.30),
+        }, "TikTok")
+
+        tiktok_sub = (tt_intent_norm * w["intent"] +
+                      tt_purchase_norm * w["purchase"] +
+                      engagement_rate_norm * w["engagement"])
+
+        # Apply negative signal penalty
+        penalty = _negative_penalty(tt_purchase_count, tt_negative_count)
+        tiktok_sub *= penalty
+
+        logger.info("[scoring] TikTok: intent=%.1f purchase=%.1f(%d) eng=%.1f penalty=%.2f → %.1f",
+                    tt_intent_norm, tt_purchase_norm, tt_purchase_count,
+                    engagement_rate_norm, penalty, tiktok_sub)
         j1_parts["tiktok"] = (tiktok_sub, 0.40)
 
     if instagram:
         ig_likes = instagram.get("total_upvotes", 0) or 0
-        ig_comments = instagram.get("total_comment_count", 0) or 0
+        ig_comments_raw = instagram.get("total_comment_count", 0) or 0
         ig_mentions = instagram.get("mention_count", 0) or 0
         if ig_mentions == 0:
             try:
@@ -120,12 +182,39 @@ def _score_product(db, product, run_id):
                 ig_mentions = len(pc.data or [])
             except Exception:
                 pass
-        ig_intent = (instagram.get("avg_intent_score", 0) or 0) * 100
-        # Engagement rate — scale so 20 engagements/post = 100
-        ig_eng = min(100, ((ig_likes + ig_comments) / max(ig_mentions, 1)) * 5)
-        # Content volume
-        ig_vol = min(100, max(0, math.log10(max(ig_mentions, 1)) * 30))
-        ig_sub = ig_eng * 0.40 + ig_vol * 0.30 + ig_intent * 0.30
+
+        # Engagement per post (log scale, more aggressive)
+        ig_avg_eng = (ig_likes + ig_comments_raw) / max(ig_mentions, 1)
+        ig_engagement_norm = min(100, max(0, math.log10(max(ig_avg_eng, 1)) * 25))
+
+        # Weighted comment intent (from Pass 2)
+        ig_intent = (instagram.get("weighted_comment_intent") or
+                     instagram.get("avg_intent_score", 0) or 0) * 100
+        ig_intent_norm = min(100, max(0, ig_intent))
+
+        # Purchase signal normalization
+        ig_purchase_count = instagram.get("purchase_signal_count", 0) or 0
+        ig_negative_count = instagram.get("negative_signal_count", 0) or 0
+        ig_purchase_norm = _purchase_signal_norm(ig_purchase_count, "INSTAGRAM")
+
+        # Weights from env (must sum to 1.0)
+        w = _assert_weights_sum_to_one({
+            "intent": _env_float("INSTAGRAM_WEIGHT_INTENT", 0.45),
+            "purchase": _env_float("INSTAGRAM_WEIGHT_PURCHASE", 0.30),
+            "engagement": _env_float("INSTAGRAM_WEIGHT_ENGAGEMENT", 0.25),
+        }, "Instagram")
+
+        ig_sub = (ig_intent_norm * w["intent"] +
+                  ig_purchase_norm * w["purchase"] +
+                  ig_engagement_norm * w["engagement"])
+
+        # Apply negative signal penalty
+        penalty = _negative_penalty(ig_purchase_count, ig_negative_count)
+        ig_sub *= penalty
+
+        logger.info("[scoring] Instagram: intent=%.1f purchase=%.1f(%d) eng=%.1f penalty=%.2f → %.1f",
+                    ig_intent_norm, ig_purchase_norm, ig_purchase_count,
+                    ig_engagement_norm, penalty, ig_sub)
         j1_parts["instagram"] = (ig_sub, 0.30)
 
     if j1_parts:
@@ -138,11 +227,44 @@ def _score_product(db, product, run_id):
     job2 = None
     j2_parts = {}
     if reddit:
-        sent = max(0, min(100, (reddit.get("sentiment_score", 0) + 1) * 50))
-        vel = max(0, min(100, (reddit.get("velocity", 0) + 1.0) * 50))
-        intent = (reddit.get("avg_intent_score", 0) or 0) * 100
-        vol = min(100, max(0, math.log10(max(reddit.get("mention_count", 1), 1)) * 50))
-        j2_parts["reddit"] = (sent * 0.25 + vel * 0.25 + intent * 0.25 + vol * 0.25, 0.35)
+        # Weighted sentiment from Pass 2 (already in -1 to 1 range)
+        weighted_sent = reddit.get("weighted_sentiment") or reddit.get("sentiment_score", 0) or 0
+        weighted_sentiment_norm = max(0, min(100, (weighted_sent + 1) * 50))
+
+        # Weighted comment intent (from Pass 2)
+        r_intent = (reddit.get("weighted_comment_intent") or
+                    reddit.get("avg_intent_score", 0) or 0) * 100
+        r_intent_norm = min(100, max(0, r_intent))
+
+        # Purchase signal normalization
+        r_purchase_count = reddit.get("purchase_signal_count", 0) or 0
+        r_negative_count = reddit.get("negative_signal_count", 0) or 0
+        r_purchase_norm = _purchase_signal_norm(r_purchase_count, "REDDIT")
+
+        # Volume (log of mentions/posts)
+        r_volume_norm = min(100, max(0, math.log10(max(reddit.get("mention_count", 1), 1)) * 50))
+
+        # Weights from env (must sum to 1.0)
+        w = _assert_weights_sum_to_one({
+            "intent": _env_float("REDDIT_WEIGHT_INTENT", 0.40),
+            "purchase": _env_float("REDDIT_WEIGHT_PURCHASE", 0.25),
+            "sentiment": _env_float("REDDIT_WEIGHT_SENTIMENT", 0.20),
+            "volume": _env_float("REDDIT_WEIGHT_VOLUME", 0.15),
+        }, "Reddit")
+
+        reddit_sub = (r_intent_norm * w["intent"] +
+                      r_purchase_norm * w["purchase"] +
+                      weighted_sentiment_norm * w["sentiment"] +
+                      r_volume_norm * w["volume"])
+
+        # Apply negative signal penalty
+        penalty = _negative_penalty(r_purchase_count, r_negative_count)
+        reddit_sub *= penalty
+
+        logger.info("[scoring] Reddit: intent=%.1f purchase=%.1f(%d) sent=%.1f vol=%.1f penalty=%.2f → %.1f",
+                    r_intent_norm, r_purchase_norm, r_purchase_count,
+                    weighted_sentiment_norm, r_volume_norm, penalty, reddit_sub)
+        j2_parts["reddit"] = (reddit_sub, 0.35)
 
     if gt:
         slope = gt.get("slope_24m", 0) or 0
@@ -163,10 +285,68 @@ def _score_product(db, product, run_id):
     # Job 3: Purchase Intent (Amazon 50%, Etsy 30%, Walmart 20%)
     job3 = None
     if amazon:
-        rank = amazon.get("bestseller_rank") or 500
-        review_sent = (amazon.get("review_sentiment", 0) or 0) * 100
-        rank_norm = max(0, min(100, (500 - rank) / 5))
-        job3 = rank_norm * 0.5 + review_sent * 0.5
+        # Monthly purchase volume — strongest purchase confirmation
+        mpv = amazon.get("monthly_purchase_volume", 0) or 0
+        t1 = _env_float("AMAZON_VOLUME_TIER_1", 100)
+        t2 = _env_float("AMAZON_VOLUME_TIER_2", 500)
+        t3 = _env_float("AMAZON_VOLUME_TIER_3", 1000)
+        t4 = _env_float("AMAZON_VOLUME_TIER_4", 5000)
+        t5 = _env_float("AMAZON_VOLUME_TIER_5", 10000)
+        if mpv >= t5: vol_norm = 100
+        elif mpv >= t4: vol_norm = 90
+        elif mpv >= t3: vol_norm = 70
+        elif mpv >= t2: vol_norm = 50
+        elif mpv >= t1: vol_norm = 30
+        elif mpv > 0: vol_norm = 10
+        else: vol_norm = 0  # No monthly volume data
+
+        # BSR score — use bsr_rank_actual if available, fall back to bestseller_rank
+        rank = amazon.get("bsr_rank_actual") or amazon.get("bestseller_rank") or 0
+        bsr_trend = amazon.get("bsr_trend", "unknown")
+        bt1 = _env_float("AMAZON_BSR_TIER_1", 100)
+        bt2 = _env_float("AMAZON_BSR_TIER_2", 1000)
+        bt3 = _env_float("AMAZON_BSR_TIER_3", 10000)
+        bt4 = _env_float("AMAZON_BSR_TIER_4", 50000)
+        bt5 = _env_float("AMAZON_BSR_TIER_5", 100000)
+        if rank and rank > 0:
+            if rank < bt1: bsr_norm = 90
+            elif rank < bt2: bsr_norm = 70
+            elif rank < bt3: bsr_norm = 50
+            elif rank < bt4: bsr_norm = 30
+            elif rank < bt5: bsr_norm = 10
+            else: bsr_norm = 0
+            if bsr_trend == "rising": bsr_norm = min(100, bsr_norm + 10)
+            elif bsr_trend == "declining": bsr_norm = max(0, bsr_norm - 10)
+        else:
+            bsr_norm = 40  # No BSR data — neutral
+
+        # Satisfaction score (includes negative review penalty implicitly)
+        satisfaction = amazon.get("satisfaction_score", 0) or 0
+        satisfaction_norm = max(0, min(100, satisfaction))
+
+        # Repeat purchase / high intent from reviews
+        high_intent = amazon.get("high_intent_count", 0) or 0
+        total_reviews = amazon.get("review_count", 1) or 1
+        repeat_norm = min(100, (high_intent / max(total_reviews, 1)) * 500)
+
+        # Review velocity — monthly rate
+        vel_monthly = amazon.get("review_velocity_monthly", 0) or 0
+        vel_norm = min(100, max(0, math.log10(max(vel_monthly + 1, 1)) * 30))
+
+        # Weights from env (must sum to 1.0)
+        w_vol = _env_float("AMAZON_WEIGHT_MONTHLY_VOLUME", 0.30)
+        w_rep = _env_float("AMAZON_WEIGHT_REPEAT_PURCHASE", 0.25)
+        w_sat = _env_float("AMAZON_WEIGHT_SATISFACTION", 0.20)
+        w_bsr = _env_float("AMAZON_WEIGHT_BSR", 0.15)
+        w_vel = _env_float("AMAZON_WEIGHT_REVIEW_VELOCITY", 0.10)
+        w_sum = w_vol + w_rep + w_sat + w_bsr + w_vel
+        if abs(w_sum - 1.0) > 0.01:
+            logger.warning("[scoring] Amazon weights sum to %.3f, not 1.0 — normalizing", w_sum)
+            w_vol, w_rep, w_sat, w_bsr, w_vel = w_vol/w_sum, w_rep/w_sum, w_sat/w_sum, w_bsr/w_sum, w_vel/w_sum
+
+        job3 = vol_norm * w_vol + repeat_norm * w_rep + satisfaction_norm * w_sat + bsr_norm * w_bsr + vel_norm * w_vel
+        logger.info("[scoring] Job 3: vol=%.1f(%d/mo) repeat=%.1f satisfaction=%.1f bsr=%.1f(%s) vel=%.1f → %.1f",
+                    vol_norm, mpv, repeat_norm, satisfaction_norm, bsr_norm, bsr_trend, vel_norm, job3)
 
     # Job 4: Supply Readiness (Alibaba 100%)
     job4 = None
@@ -202,7 +382,8 @@ def _score_product(db, product, run_id):
 
     # Coverage penalty applied FIRST (reduces score for incomplete data)
     coverage_ratio = len(active) / total_jobs
-    coverage_penalty = 0.5 + (coverage_ratio * 0.5)
+    penalty_floor = _env_float("COVERAGE_PENALTY_FLOOR", 0.5)
+    coverage_penalty = penalty_floor + (coverage_ratio * (1.0 - penalty_floor))
     adjusted = raw_score * coverage_penalty
 
     # Quality multiplier applied AFTER coverage

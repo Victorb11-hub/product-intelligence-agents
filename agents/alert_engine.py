@@ -1,10 +1,16 @@
 """
 Alert Engine — Fires alerts based on scoring changes, council results, and system health.
+All thresholds read from environment variables.
 """
+import os
 import logging
 from datetime import date, datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+def _env(key, default):
+    try: return float(os.environ.get(key, default))
+    except (ValueError, TypeError): return float(default)
 
 
 def run_alert_scan(db, products, run_id):
@@ -31,9 +37,10 @@ def run_alert_scan(db, products, run_id):
                   f"{name} verdict changed: {prev_verdict} -> {verdict} (score {prev_score} -> {score})")
             alert_count += 1
 
-        # 2. Score movement > 10 points
+        # 2. Score movement > threshold points
+        score_change_threshold = _env("ALERT_SCORE_CHANGE_THRESHOLD", 10)
         change = score - prev_score
-        if abs(change) > 10:
+        if abs(change) > score_change_threshold:
             _fire(db, pid, "score_acceleration" if change > 0 else "fad_warning",
                   "warning", f"{name} score moved {change:+.1f} points ({prev_score:.1f} -> {score:.1f})")
             alert_count += 1
@@ -44,16 +51,18 @@ def run_alert_scan(db, products, run_id):
                 .eq("product_id", pid).execute().data or []
         except Exception:
             all_scores = []
-        above_75 = [s for s in all_scores if (s.get("composite_score") or 0) >= 75]
-        if score >= 75 and len(above_75) == 0:
+        buy_thresh = _env("BUY_THRESHOLD", 75)
+        above_buy = [s for s in all_scores if (s.get("composite_score") or 0) >= buy_thresh]
+        if score >= buy_thresh and len(above_buy) == 0:
             _fire(db, pid, "green_flag", "critical",
-                  f"{name} crossed Buy threshold (75) for the first time! Score: {score}")
+                  f"{name} crossed Buy threshold ({buy_thresh:.0f}) for the first time! Score: {score}")
             alert_count += 1
 
-        # 4. Score drops below 55 from above
-        if score < 55 and prev_score >= 55:
+        # 4. Score drops below Watch threshold from above
+        watch_thresh = _env("WATCH_THRESHOLD", 55)
+        if score < watch_thresh and prev_score >= watch_thresh:
             _fire(db, pid, "fad_warning", "warning",
-                  f"{name} dropped below Watch threshold (55). Was {prev_score:.1f}, now {score:.1f}")
+                  f"{name} dropped below Watch threshold ({watch_thresh:.0f}). Was {prev_score:.1f}, now {score:.1f}")
             alert_count += 1
 
         # 5. Council unanimous Buy
@@ -88,10 +97,13 @@ def run_alert_scan(db, products, run_id):
     month_start = f"{date.today().strftime('%Y-%m')}-01"
     costs = db.table("agent_runs").select("apify_estimated_cost").gte("created_at", month_start).execute().data
     total_cost = sum(r.get("apify_estimated_cost", 0) or 0 for r in costs)
-    if total_cost >= 18.75:  # 75% of $25
-        severity = "critical" if total_cost >= 22.50 else "warning"
+    budget = _env("APIFY_MONTHLY_BUDGET", 29.0)
+    warn_pct = _env("ALERT_BUDGET_WARNING_PCT", 75) / 100
+    crit_pct = _env("ALERT_BUDGET_CRITICAL_PCT", 90) / 100
+    if total_cost >= budget * warn_pct:
+        severity = "critical" if total_cost >= budget * crit_pct else "warning"
         _fire(db, None, "fad_warning", severity,
-              f"Apify monthly spend: ${total_cost:.2f} of $25.00 ({total_cost/25*100:.0f}%)")
+              f"Apify monthly spend: ${total_cost:.2f} of ${budget:.2f} ({total_cost/budget*100:.0f}%)")
         alert_count += 1
 
     logger.info("[alerts] Fired %d alerts", alert_count)

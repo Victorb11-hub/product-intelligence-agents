@@ -1,4 +1,4 @@
-"""One-shot query: Korean Sheet Masks signal data from Supabase."""
+"""Quick query: latest signals_social rows for a product on TikTok and Instagram."""
 import json, os, sys
 from dotenv import load_dotenv
 
@@ -20,81 +20,43 @@ headers = {
 
 pg = SyncPostgrestClient(rest_url, headers=headers)
 
-def dump(label, data):
+PRODUCT_ID = "f0620e1e-83fd-45c9-ac92-dd922e4c674c"
+
+KEY_FIELDS = [
+    "id", "product_id", "platform", "period_start", "period_end", "scraped_date",
+    "mention_count", "total_views", "total_upvotes", "total_comment_count",
+    "creator_tier_score", "avg_intent_score",
+    "high_intent_comment_count", "buy_intent_comment_count",
+    "sentiment_positive", "sentiment_negative", "sentiment_neutral",
+    "engagement_rate", "created_at",
+]
+
+for platform in ("tiktok", "instagram"):
     print(f"\n{'='*60}")
-    print(f"  {label}")
+    print(f"  signals_social  |  platform={platform}")
     print(f"{'='*60}")
-    print(json.dumps(data, indent=2, default=str))
-
-# 1. Product row for Korean Sheet Masks
-res = pg.from_("products").select("*").ilike("name", "%korean%sheet%mask%").execute()
-products = res.data
-dump("PRODUCTS — Korean Sheet Masks", products)
-
-if not products:
-    # Try broader search
-    res = pg.from_("products").select("*").ilike("name", "%sheet%mask%").execute()
-    products = res.data
-    dump("PRODUCTS — broader: Sheet Mask", products)
-
-if not products:
-    # List all products so we can find it
-    res = pg.from_("products").select("id,name").execute()
-    dump("ALL PRODUCTS (to find the right one)", res.data)
-    sys.exit(1)
-
-pid = products[0]["id"]
-print(f"\n>>> Using product_id = {pid}")
-
-# 2. Most recent signals_social for reddit, tiktok, instagram
-for platform in ["reddit", "tiktok", "instagram"]:
-    res = (
+    resp = (
         pg.from_("signals_social")
         .select("*")
-        .eq("product_id", pid)
+        .eq("product_id", PRODUCT_ID)
         .eq("platform", platform)
         .order("scraped_date", desc=True)
         .limit(1)
         .execute()
     )
-    dump(f"SIGNALS_SOCIAL — {platform}", res.data)
-
-# 3. Most recent signals_search for google_trends
-res = (
-    pg.from_("signals_search")
-    .select("*")
-    .eq("product_id", pid)
-    .eq("platform", "google_trends")
-    .order("scraped_date", desc=True)
-    .limit(1)
-    .execute()
-)
-dump("SIGNALS_SEARCH — google_trends", res.data)
-
-# 4. Most recent product_snapshots
-res = (
-    pg.from_("product_snapshots")
-    .select("*")
-    .eq("product_id", pid)
-    .order("snapshot_date", desc=True)
-    .limit(1)
-    .execute()
-)
-dump("PRODUCT_SNAPSHOTS — latest", res.data)
-
-# 5. Posts count by platform
-# PostgREST doesn't support GROUP BY easily, so fetch counts per platform
-for platform in ["reddit", "tiktok", "instagram", "x", "facebook", "youtube",
-                  "google_trends", "amazon", "walmart", "etsy", "alibaba", "pinterest"]:
-    res = (
-        pg.from_("posts")
-        .select("id", count="exact")
-        .eq("product_id", pid)
-        .eq("platform", platform)
-        .execute()
-    )
-    count = res.count if res.count is not None else len(res.data)
-    if count > 0:
-        print(f"  posts/{platform}: {count}")
+    rows = resp.data
+    if not rows:
+        print("  (no rows found)")
+        continue
+    row = rows[0]
+    for k in KEY_FIELDS:
+        if k in row:
+            print(f"  {k:30s} = {row[k]}")
+    # Print any extra columns not in KEY_FIELDS
+    extras = set(row.keys()) - set(KEY_FIELDS)
+    if extras:
+        print(f"\n  -- extra columns --")
+        for k in sorted(extras):
+            print(f"  {k:30s} = {row[k]}")
 
 print("\nDone.")

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Intelligence System — Complete Manual</title>
+<style>
+  :root { --bg: #f9fafb; --card: #fff; --border: #e5e7eb; --text: #1f2937; --muted: #6b7280; --accent: #6366f1; --green: #059669; --amber: #d97706; --red: #dc2626; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--bg); line-height: 1.7; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .header { background: #0f0f0f; color: white; padding: 48px 0; text-align: center; }
+  .header h1 { font-size: 32px; font-weight: 800; margin-bottom: 4px; }
+  .header p { color: #9ca3af; font-size: 15px; }
+  .header .version { color: #4b5563; font-size: 12px; margin-top: 12px; }
+
+  .container { max-width: 860px; margin: 0 auto; padding: 24px 20px; }
+
+  .toc { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px 32px; margin-bottom: 32px; }
+  .toc h2 { font-size: 18px; margin-bottom: 16px; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 6px 0; font-size: 14px; }
+  .toc li a { color: var(--text); font-weight: 500; }
+  .toc li a:hover { color: var(--accent); }
+  .toc .sub { padding-left: 20px; list-style: disc; }
+  .toc .sub li { font-size: 13px; color: var(--muted); }
+
+  .chapter { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-bottom: 24px; page-break-inside: avoid; }
+  .chapter h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+  .chapter h2 .num { color: var(--accent); }
+  .chapter h3 { font-size: 16px; font-weight: 700; margin: 24px 0 8px 0; color: var(--text); }
+  .chapter h4 { font-size: 14px; font-weight: 600; margin: 16px 0 6px 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .chapter p, .chapter li { font-size: 14px; margin-bottom: 8px; }
+  .chapter ul, .chapter ol { padding-left: 20px; margin-bottom: 12px; }
+
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; color: white; text-transform: uppercase; }
+  .badge-buy { background: var(--green); }
+  .badge-watch { background: var(--amber); }
+  .badge-pass { background: var(--red); }
+
+  .info { background: #eff6ff; border-left: 3px solid #3b82f6; padding: 12px 16px; border-radius: 4px; margin: 12px 0; font-size: 13px; }
+  .warn { background: #fef3c7; border-left: 3px solid var(--amber); padding: 12px 16px; border-radius: 4px; margin: 12px 0; font-size: 13px; }
+  .success { background: #f0fdf4; border-left: 3px solid var(--green); padding: 12px 16px; border-radius: 4px; margin: 12px 0; font-size: 13px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { text-align: left; padding: 8px 10px; background: #f9fafb; border-bottom: 2px solid var(--border); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+  tr:last-child td { border-bottom: none; }
+
+  code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: 'SF Mono', 'Fira Code', monospace; }
+
+  .formula { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 12px 0; font-family: 'SF Mono', monospace; font-size: 13px; line-height: 1.8; white-space: pre-wrap; }
+
+  .step { display: flex; gap: 12px; margin: 8px 0; align-items: flex-start; }
+  .step-num { background: var(--accent); color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .step-text { font-size: 14px; padding-top: 2px; }
+
+  @media print {
+    .header { padding: 24px 0; }
+    .chapter { break-inside: avoid; box-shadow: none; }
+    body { background: white; }
+  }
+  @media (max-width: 640px) {
+    .container { padding: 12px; }
+    .chapter { padding: 20px; }
+    .header h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Product Intelligence System</h1>
+  <p>Complete Manual — Evolution Equities LLC</p>
+  <div class="version">Version 1.0 &mdash; April 2026</div>
+</div>
+
+<div class="container">
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#ch1">What Is This System</a></li>
+    <li><a href="#ch2">The Dashboard</a>
+      <ul class="sub"><li>Leaderboard, Discovery, Posts & Comments, Research Council, Formula Studio, Brands, Competitors, Alerts, Sourcing, Products & Agents, Settings</li></ul>
+    </li>
+    <li><a href="#ch3">The Scoring System</a>
+      <ul class="sub"><li>4-Job System, Coverage Penalty, Verdicts, Phase Classifications</li></ul>
+    </li>
+    <li><a href="#ch4">The Platforms</a>
+      <ul class="sub"><li>Reddit, Google Trends, TikTok, Instagram, Amazon</li></ul>
+    </li>
+    <li><a href="#ch5">Daily Workflow</a>
+      <ul class="sub"><li>Every Morning, Weekly Review, Watch Triggers, Buy Triggers, Adding Products</li></ul>
+    </li>
+    <li><a href="#ch6">The Pipeline</a>
+      <ul class="sub"><li>Nightly Schedule, Failure Handling, Budget Management</li></ul>
+    </li>
+    <li><a href="#ch7">The Research Council</a>
+      <ul class="sub"><li>5 Agents, Voting, Victor Override</li></ul>
+    </li>
+    <li><a href="#ch8">Making Sourcing Decisions</a>
+      <ul class="sub"><li>Decision Framework, Pre-Sourcing Checklist</li></ul>
+    </li>
+    <li><a href="#ch9">System Administration</a>
+      <ul class="sub"><li>Users, Formula, Scrapers, Deployment, Backup</li></ul>
+    </li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 1 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch1">
+  <h2><span class="num">Chapter 1</span> &mdash; What Is This System</h2>
+
+  <h3>The Problem</h3>
+  <p>You run a health and wellness import business. You need to find trending products <em>before</em> they peak and before your competitors notice them. Manually checking TikTok, Reddit, Amazon, and Google Trends every day is unsustainable. By the time you notice a trend, it may be too late to source.</p>
+
+  <h3>The Solution</h3>
+  <p>The Product Intelligence System automates the entire trend detection pipeline. Every night, it scrapes 12 platforms, scores each product using a weighted 4-job formula, convenes an AI Research Council to deliberate, fires alerts when signals change, and sends you a daily email summary. You wake up, read one email, and know exactly which products are worth investigating.</p>
+
+  <h3>How It Works at a High Level</h3>
+  <ol>
+    <li><strong>Scrape</strong> &mdash; Automated agents collect data from Reddit, TikTok, Instagram, Amazon, Google Trends, and more. Each platform has a dedicated scraper that runs nightly.</li>
+    <li><strong>Score</strong> &mdash; A 4-job scoring engine combines all platform signals into a single composite score (0&ndash;100). Each job measures a different aspect of product demand.</li>
+    <li><strong>Deliberate</strong> &mdash; Five AI agents analyze the data independently and vote Buy, Watch, or Pass. Dissenting opinions are surfaced, not suppressed.</li>
+    <li><strong>Alert</strong> &mdash; When scores cross thresholds, verdicts change, or concerning patterns emerge, alerts fire immediately.</li>
+    <li><strong>Report</strong> &mdash; A daily email arrives with scores, intelligence summaries, platform highlights, and actionable insights.</li>
+  </ol>
+
+  <h3>A Typical Day</h3>
+  <p>At 1:00 AM, the pipeline starts. By 4:00 AM, all scrapers have run, scores are updated, the Research Council has deliberated, and your daily email is sent. When you check your inbox around 8&ndash;9 AM, you see a complete intelligence report. If something needs attention, you open the dashboard and drill into the product scorecard.</p>
+
+  <h3>Who Should Use It</h3>
+  <ul>
+    <li><strong>Victor (Owner)</strong> &mdash; Full access. Makes final sourcing decisions. Can override the Research Council. Manages formula weights and system configuration.</li>
+    <li><strong>Analysts</strong> &mdash; Can view all data, manage products, track brands/competitors, and log sourcing decisions. Cannot modify the scoring formula or system settings.</li>
+    <li><strong>Viewers</strong> &mdash; Read-only access to the leaderboard, discovery feed, posts, council verdicts, and alerts. Good for partners who need visibility without control.</li>
+  </ul>
+
+  <h3>What Decisions It Helps Make</h3>
+  <ul>
+    <li>Which products are trending up and worth investigating?</li>
+    <li>Is a trending product a fad or a lasting opportunity?</li>
+    <li>Are real people buying, or is it just social media noise?</li>
+    <li>What&rsquo;s the sentiment among actual buyers on Amazon?</li>
+    <li>When is the right time to source &mdash; too early, in the window, or too late?</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 2 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch2">
+  <h2><span class="num">Chapter 2</span> &mdash; The Dashboard</h2>
+  <p>The dashboard is a React application deployed on Vercel. It connects to Supabase (PostgreSQL) for all data. Every tab serves a specific purpose.</p>
+
+  <h3>Leaderboard</h3>
+  <p>The main landing page. Shows all tracked products ranked by composite score.</p>
+  <table>
+    <tr><th>Column</th><th>What It Means</th></tr>
+    <tr><td>Product</td><td>Product name. Click to open the full scorecard.</td></tr>
+    <tr><td>Score</td><td>Adjusted composite score (0&ndash;100). Accounts for coverage penalty and data quality.</td></tr>
+    <tr><td>Raw</td><td>Score before coverage penalty. Shows what the score <em>would be</em> with full data coverage.</td></tr>
+    <tr><td>Verdict</td><td><span class="badge badge-buy">Buy</span> (75+), <span class="badge badge-watch">Watch</span> (55&ndash;74), or <span class="badge badge-pass">Pass</span> (&lt;55).</td></tr>
+    <tr><td>Phase</td><td>Where the product is in its lifecycle: Early, Buy Window, Peak, Plateau, Declining.</td></tr>
+    <tr><td>Coverage Bar</td><td>Shows how many of the 4 scoring jobs have data. More coverage = more reliable score.</td></tr>
+    <tr><td>Change</td><td>Score change since last run. Green arrow up = improving. Red arrow down = declining.</td></tr>
+  </table>
+  <div class="info"><strong>Every morning:</strong> Check the leaderboard for score changes. Products moving from Pass toward Watch deserve attention. Products dropping from Watch toward Pass may indicate a fading trend.</div>
+
+  <h3>Product Scorecard</h3>
+  <p>Click any product name to open its full scorecard. This is the most detailed view in the system.</p>
+  <ul>
+    <li><strong>Score Card</strong> &mdash; Large adjusted score with verdict badge, raw score, coverage percentage.</li>
+    <li><strong>24-Month Chart</strong> &mdash; Three lines: Google Trends historical estimate (dashed gray), social signal strength (dashed purple), real composite score (solid). Buy (75) and Watch (55) thresholds shown as reference lines.</li>
+    <li><strong>Intelligence Summary</strong> &mdash; Plain English interpretation of what the combined data means. Green border = positive signals. Amber = mixed. Red = concerning. Per-platform one-liners with status dots (green/amber/red).</li>
+    <li><strong>Platform Signals</strong> &mdash; Every active platform with its latest data. Inactive platforms shown grayed out with explanation of what they would add.</li>
+  </ul>
+
+  <h3>Discovery Tab</h3>
+  <p>Shows products found by the Trend Discovery engine that aren&rsquo;t yet being tracked.</p>
+  <ul>
+    <li><strong>Confidence Score</strong> &mdash; How likely this is a real emerging product (0&ndash;100%). Based on cross-platform mentions, category growth, and keyword frequency.</li>
+    <li><strong>Source</strong> &mdash; Which platform(s) surfaced this candidate.</li>
+    <li><strong>Add to Tracking</strong> &mdash; One-click button to create the product, set keywords, and start scraping.</li>
+    <li><strong>Dismiss</strong> &mdash; Mark as not relevant with a reason. The system learns from dismissals.</li>
+  </ul>
+
+  <h3>Posts & Comments</h3>
+  <p>Raw scraped content from all platforms. This is where you see actual human-written posts, comments, and reviews.</p>
+  <ul>
+    <li><strong>Platform filter</strong> &mdash; Column headers change per platform. Reddit shows &ldquo;Subreddit&rdquo; and &ldquo;Upvotes.&rdquo; TikTok shows &ldquo;Account&rdquo; and &ldquo;Views.&rdquo; Amazon shows &ldquo;Brand&rdquo; and &ldquo;Reviews.&rdquo;</li>
+    <li><strong>Intent levels L1&ndash;L5</strong> &mdash; Each post/comment is scored for purchase intent:
+      <table>
+        <tr><th>Level</th><th>Meaning</th><th>Examples</th></tr>
+        <tr><td><strong>L1</strong> (0.1)</td><td>Awareness</td><td>&ldquo;heard about this,&rdquo; &ldquo;saw on TikTok&rdquo;</td></tr>
+        <tr><td><strong>L2</strong> (0.3)</td><td>Interest</td><td>&ldquo;looks interesting,&rdquo; &ldquo;intrigued&rdquo;</td></tr>
+        <tr><td><strong>L3</strong> (0.5)</td><td>Consideration</td><td>&ldquo;thinking about buying,&rdquo; &ldquo;should I try?&rdquo;</td></tr>
+        <tr><td><strong>L4</strong> (0.8)</td><td>Intent</td><td>&ldquo;where can I buy,&rdquo; &ldquo;adding to cart&rdquo;</td></tr>
+        <tr><td><strong>L5</strong> (1.0)</td><td>Purchase</td><td>&ldquo;just bought,&rdquo; &ldquo;on my third bottle,&rdquo; &ldquo;reordering&rdquo;</td></tr>
+      </table>
+    </li>
+    <li><strong>Min Intent slider</strong> &mdash; Filter to only show L3+ or L4+ to focus on high-intent content.</li>
+    <li><strong>Click any post</strong> to expand and see its comments with intent scores and flag badges (BUY, PROBLEM, REPEAT).</li>
+  </ul>
+
+  <h3>Research Council</h3>
+  <p>Shows the AI deliberation results for each product.</p>
+  <ul>
+    <li><strong>Vote Tally</strong> &mdash; How many agents voted Buy, Watch, or Pass (e.g., 3-1-1).</li>
+    <li><strong>Individual Reasoning</strong> &mdash; Each agent&rsquo;s reasoning and vote, so you can see <em>why</em> they voted the way they did.</li>
+    <li><strong>Dissent</strong> &mdash; When agents disagree, the dissenting opinion is highlighted. Dissent is valuable &mdash; it identifies risks the majority missed.</li>
+    <li><strong>Victor Override</strong> &mdash; Submit your own vote that carries 1.5x weight. Use this when you have domain knowledge the AI doesn&rsquo;t.</li>
+  </ul>
+
+  <h3>Formula Studio</h3>
+  <p>Edit the scoring formula in real time. Owner-only access.</p>
+  <ul>
+    <li><strong>Job Weights</strong> &mdash; Adjust the 4 job weights (default: 30/30/25/15). All must sum to 100%.</li>
+    <li><strong>Thresholds</strong> &mdash; Visual bar showing Pass/Watch/Buy zones. Drag to adjust the Buy (75) and Watch (55) thresholds.</li>
+    <li><strong>Signal Weights</strong> &mdash; Fine-tune how individual platform signals contribute within each job.</li>
+    <li><strong>Override Rules</strong> &mdash; Conditional rules like &ldquo;If Reddit sentiment &lt; -0.3, downgrade Buy to Watch.&rdquo;</li>
+    <li><strong>Recompute All Scores</strong> &mdash; Button to recalculate all product scores with the current formula. Use after making weight changes.</li>
+  </ul>
+  <div class="warn"><strong>Caution:</strong> Weight changes affect all products immediately. Make small adjustments and recompute to see the impact before committing.</div>
+
+  <h3>Brands Tab</h3>
+  <p>Track brands in your product categories. Add brand names, set threat levels (Low/Medium/High), and add notes about their market position. Useful for competitive awareness.</p>
+
+  <h3>Competitors Tab</h3>
+  <p>Track specific competitor companies. Monitor what they&rsquo;re doing in your categories and record competitive intelligence observations.</p>
+
+  <h3>Alerts Tab</h3>
+  <p>All system alerts, sorted by recency. Alerts fire automatically when:</p>
+  <ul>
+    <li>A product&rsquo;s verdict changes (e.g., Pass &rarr; Watch)</li>
+    <li>Score moves more than 10 points in one run</li>
+    <li>Score crosses the Buy threshold (75) for the first time</li>
+    <li>Score drops below Watch threshold (55) from above</li>
+    <li>Research Council reaches unanimous Buy (4+ votes)</li>
+    <li>Apify monthly spend exceeds 75% of budget</li>
+    <li>Amazon 1-star reviews increase by 3%+ week over week</li>
+  </ul>
+  <p>Click any alert to mark it as actioned.</p>
+
+  <h3>Sourcing Log</h3>
+  <p>Record sourcing decisions and outcomes. When you decide to source (or pass on) a product, log it here with the reason. The learning system uses these outcomes to calibrate formula weights over time.</p>
+  <ul>
+    <li><strong>Outcome types:</strong> Sourced &amp; Profitable, Sourced &amp; Broke Even, Sourced &amp; Lost Money, Passed &amp; Right, Passed &amp; Missed Opportunity.</li>
+  </ul>
+
+  <h3>Products & Agents</h3>
+  <ul>
+    <li><strong>Add Product</strong> &mdash; Name, category, keywords (for search), hashtags (for social), target subreddits, and the first-seen date.</li>
+    <li><strong>Keywords</strong> are used for Reddit and Amazon search. Use the product name plus 2&ndash;3 variants.</li>
+    <li><strong>Hashtags</strong> are auto-generated from keywords (spaces removed) for TikTok and Instagram.</li>
+    <li><strong>Agent Dashboard</strong> &mdash; Shows all 12 platform agents with status badges (Active/Idle/Failed), last run time, rows written, and dedup savings.</li>
+    <li><strong>Trigger Now</strong> &mdash; Run any single agent manually without waiting for the nightly pipeline.</li>
+    <li><strong>Run History</strong> &mdash; Log of every agent run with status, duration, items scraped, and errors.</li>
+  </ul>
+
+  <h3>Settings</h3>
+  <table>
+    <tr><th>Section</th><th>What It Controls</th></tr>
+    <tr><td>Email</td><td>Manage recipients. Toggle daily/monthly/quarterly/alert emails per recipient.</td></tr>
+    <tr><td>Users</td><td>Add/remove dashboard users. Set roles: Owner, Analyst, Viewer.</td></tr>
+    <tr><td>Pipeline</td><td>Nightly run time, Apify budget limit, max posts per product, notification toggles, data lookback windows per platform, Amazon settings (search results, top N, min reviews, 1-star alert threshold).</td></tr>
+    <tr><td>Scrapers</td><td>Registry of all Apify actors. Shows actor ID, cost per 1K, status, last run time.</td></tr>
+    <tr><td>Data</td><td>Data retention settings and cleanup schedules.</td></tr>
+    <tr><td>About</td><td>System health indicators, database stats, version info.</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 3 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch3">
+  <h2><span class="num">Chapter 3</span> &mdash; The Scoring System</h2>
+
+  <h3>The 4-Job System</h3>
+  <p>Every product is evaluated across four independent jobs. Each job answers a different question about product demand.</p>
+
+  <h4>Job 1 &mdash; Early Detection (30% weight)</h4>
+  <p><strong>Question:</strong> &ldquo;Is this product generating organic social buzz?&rdquo;</p>
+  <table>
+    <tr><th>Platform</th><th>Weight within Job</th><th>What It Measures</th></tr>
+    <tr><td>TikTok</td><td>40%</td><td>View velocity, engagement per video, comment intent, creator tier</td></tr>
+    <tr><td>Instagram</td><td>30%</td><td>Engagement per post, comment intent, content volume, caption intent</td></tr>
+    <tr><td>YouTube</td><td>15%</td><td>Long-form reviews, tutorial demand (pending activation)</td></tr>
+    <tr><td>X (Twitter)</td><td>10%</td><td>Real-time buzz, news-driven spikes (pending activation)</td></tr>
+    <tr><td>Pinterest</td><td>5%</td><td>Save rates, demographic reach (pending activation)</td></tr>
+  </table>
+  <div class="formula">TikTok sub-score:
+  vel_norm * 0.50 + eng_norm * 0.30 + comment_intent * 0.15 + creator_tier * 0.05
+
+Instagram sub-score:
+  engagement * 0.45 + comment_intent * 0.25 + volume * 0.20 + caption_intent * 0.10</div>
+
+  <h4>Job 2 &mdash; Demand Validation (30% weight)</h4>
+  <p><strong>Question:</strong> &ldquo;Is there real, sustained consumer demand beyond social media hype?&rdquo;</p>
+  <table>
+    <tr><th>Platform</th><th>Weight within Job</th><th>What It Measures</th></tr>
+    <tr><td>Google Trends</td><td>45%</td><td>24-month slope, year-over-year growth, breakout detection, seasonal patterns</td></tr>
+    <tr><td>Reddit</td><td>35%</td><td>Sentiment, velocity, purchase intent score, discussion volume, buy-intent bonus</td></tr>
+    <tr><td>Facebook</td><td>20%</td><td>Community group demand (pending activation)</td></tr>
+  </table>
+  <div class="formula">Reddit sub-score:
+  sentiment * 0.25 + velocity * 0.20 + intent * 0.20 + volume * 0.25 + intent_bonus * 0.10
+
+Google Trends sub-score:
+  slope_norm * 0.40 + yoy_norm * 0.40 + lasting_bonus (20 if not breakout)</div>
+
+  <h4>Job 3 &mdash; Purchase Intent (25% weight)</h4>
+  <p><strong>Question:</strong> &ldquo;Are people actually buying this product?&rdquo;</p>
+  <table>
+    <tr><th>Platform</th><th>Weight within Job</th><th>What It Measures</th></tr>
+    <tr><td>Amazon</td><td>50%</td><td>BSR trend, review velocity, rating score, satisfaction score, repeat purchase signals</td></tr>
+    <tr><td>Etsy</td><td>30%</td><td>Handmade vs mass market ratio (pending activation)</td></tr>
+    <tr><td>Walmart</td><td>20%</td><td>Mass market demand validation (pending activation)</td></tr>
+  </table>
+  <div class="formula">Amazon sub-score:
+  bsr_trend * 0.35 + review_velocity * 0.25 + rating * 0.20 + satisfaction * 0.15 + repeat * 0.05</div>
+
+  <h4>Job 4 &mdash; Supply Readiness (15% weight)</h4>
+  <p><strong>Question:</strong> &ldquo;Can you actually source this product at viable margins?&rdquo;</p>
+  <table>
+    <tr><th>Platform</th><th>Weight within Job</th><th>What It Measures</th></tr>
+    <tr><td>Alibaba</td><td>100%</td><td>Supplier count, MOQ trends, unit pricing, competing suppliers</td></tr>
+  </table>
+  <p>Supply readiness matters because a trending product with no reliable supplier is not actionable. A product with many suppliers competing on price suggests good sourcing conditions.</p>
+
+  <h3>The Coverage Penalty</h3>
+  <p>The coverage penalty exists because incomplete data should produce lower confidence, not inflated scores.</p>
+  <div class="formula">coverage_ratio = active_jobs / 4
+coverage_penalty = 0.5 + (coverage_ratio * 0.5)
+adjusted_score = raw_score * coverage_penalty</div>
+  <table>
+    <tr><th>Active Jobs</th><th>Coverage</th><th>Penalty</th><th>Effect on Raw Score of 70</th></tr>
+    <tr><td>1 of 4</td><td>25%</td><td>0.625x</td><td>70 &rarr; 43.8</td></tr>
+    <tr><td>2 of 4</td><td>50%</td><td>0.75x</td><td>70 &rarr; 52.5</td></tr>
+    <tr><td>3 of 4</td><td>75%</td><td>0.875x</td><td>70 &rarr; 61.3</td></tr>
+    <tr><td>4 of 4</td><td>100%</td><td>1.0x</td><td>70 &rarr; 70.0</td></tr>
+  </table>
+  <p>This means a product needs data from at least 3 jobs to have a realistic chance of reaching Watch (55), and typically needs all 4 jobs active to reach Buy (75).</p>
+
+  <h3>Verdict Thresholds</h3>
+  <table>
+    <tr><th>Verdict</th><th>Score Range</th><th>What It Means</th><th>What To Do</th></tr>
+    <tr><td><span class="badge badge-buy">Buy</span></td><td>75&ndash;100</td><td>Strong, multi-platform confirmed demand with purchase signals.</td><td>Investigate seriously. Check suppliers, margins, competition. Log sourcing decision.</td></tr>
+    <tr><td><span class="badge badge-watch">Watch</span></td><td>55&ndash;74</td><td>Promising signals but not yet confirmed across enough platforms.</td><td>Monitor closely. Check which jobs are missing data. Wait for more pipeline runs.</td></tr>
+    <tr><td><span class="badge badge-pass">Pass</span></td><td>0&ndash;54</td><td>Insufficient or negative signals. May be too early or not a real trend.</td><td>Don&rsquo;t act yet. Revisit in 30 days or when more data is available.</td></tr>
+  </table>
+
+  <h3>Phase Classifications</h3>
+  <p>Phase is determined primarily by Google Trends slope, with Reddit velocity as a secondary signal.</p>
+  <table>
+    <tr><th>Phase</th><th>Definition</th><th>Implication</th></tr>
+    <tr><td><strong>Early</strong></td><td>No Google Trends data yet. Product is new to the system.</td><td>Too early to score reliably. Need at least one GT run.</td></tr>
+    <tr><td><strong>Buy Window</strong></td><td>GT slope &gt; 0.003 AND YoY growth &gt; 50%. Demand is actively rising.</td><td>Best time to source. Product is growing but hasn&rsquo;t peaked.</td></tr>
+    <tr><td><strong>Peak</strong></td><td>Composite score sustained above 75.</td><td>Strong demand but may be near maximum. Source quickly or wait for next cycle.</td></tr>
+    <tr><td><strong>Plateau</strong></td><td>GT slope is positive but weak, or conflicting signals between platforms.</td><td>Growth has slowed. May still be viable but upside is limited.</td></tr>
+    <tr><td><strong>Declining</strong></td><td>GT slope &lt; -0.003 with no contradicting positive Reddit velocity.</td><td>Demand is fading. Avoid sourcing unless you have specific reason to believe in a comeback.</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 4 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch4">
+  <h2><span class="num">Chapter 4</span> &mdash; The Platforms</h2>
+
+  <h3>Reddit</h3>
+  <p><strong>Why it matters:</strong> Reddit is where consumers have honest, long-form discussions about products. Unlike social media where content is promotional, Reddit threads contain genuine opinions, complaints, and purchase considerations.</p>
+  <h4>Two-Pass Architecture</h4>
+  <ul>
+    <li><strong>Pass 1</strong> (macrocosmos/reddit-scraper, $0.50/1K) &mdash; Keyword search across all of Reddit. Finds posts mentioning the product. Filters by relevance score (product name in title = 0.8, keyword in body = 0.2). Keeps top posts by upvotes.</li>
+    <li><strong>Pass 2</strong> (trudax/reddit-scraper-lite, $3.80/1K) &mdash; Fetches full comment threads from the top 20 posts. Every comment is scored for intent (L1&ndash;L5), sentiment (-1 to +1), and classified as buy-intent, problem-language, or repeat-purchase.</li>
+  </ul>
+  <h4>What the signals mean</h4>
+  <table>
+    <tr><th>Signal</th><th>What It Tells You</th></tr>
+    <tr><td>Mention count</td><td>How many posts discuss this product. 50+ in a niche = strong signal.</td></tr>
+    <tr><td>Sentiment (-1 to +1)</td><td>Average opinion. Above 0.2 = positive. Below -0.2 = community has concerns.</td></tr>
+    <tr><td>Avg intent score</td><td>How close to purchase the community is. Above 0.3 = active consideration.</td></tr>
+    <tr><td>High intent count</td><td>Number of L4+L5 comments. These are people actively buying or about to buy.</td></tr>
+    <tr><td>Buy intent mentions</td><td>Comments containing explicit purchase language (&ldquo;just bought,&rdquo; &ldquo;ordered&rdquo;).</td></tr>
+    <tr><td>Velocity</td><td>Week-over-week change in discussion volume. Positive = growing interest.</td></tr>
+  </table>
+  <div class="success"><strong>Good signal:</strong> 58 posts, sentiment +0.15, 134 buy-intent comments, velocity rising. Community is actively discussing and purchasing.</div>
+  <div class="warn"><strong>Concerning signal:</strong> 20 posts, sentiment -0.35, velocity declining, high problem-language count. Community is reporting issues with the product.</div>
+
+  <h3>Google Trends</h3>
+  <p><strong>Why it matters:</strong> Google Trends is the most reliable demand signal because it represents actual search behavior, not social media noise. A product with sustained GT growth over 24 months is far more likely to be a lasting opportunity than one with a viral TikTok moment.</p>
+  <h4>Key signals</h4>
+  <table>
+    <tr><th>Signal</th><th>Example Value</th><th>What It Means</th></tr>
+    <tr><td>Slope (24-month)</td><td>+0.0057</td><td>Average weekly increase in search interest. Above 0.003 = meaningful growth. Above 0.01 = strong growth.</td></tr>
+    <tr><td>YoY Growth</td><td>125%</td><td>How much more search interest this year vs last year. Above 50% with positive slope = confirmed trend.</td></tr>
+    <tr><td>Breakout Flag</td><td>false</td><td>Whether GT marked this as a sudden spike. False = organic growth, not a flash-in-the-pan.</td></tr>
+    <tr><td>Seasonal Pattern</td><td>&ldquo;variable&rdquo;</td><td>Whether the product has seasonal demand patterns (e.g., sunscreen spikes in summer).</td></tr>
+  </table>
+  <p>The GT sub-score gives a 20-point bonus for <em>not</em> being a breakout &mdash; the system rewards lasting trends over sudden spikes.</p>
+
+  <h3>TikTok</h3>
+  <p><strong>Why it matters:</strong> TikTok is the earliest signal for consumer trends. Products go viral on TikTok before they show up in Google search or Amazon sales. However, TikTok virality alone doesn&rsquo;t guarantee purchase intent &mdash; many viral products are entertainment, not purchase-driven.</p>
+  <h4>Two-Pass Architecture</h4>
+  <ul>
+    <li><strong>Pass 1</strong> (clockworks/tiktok-scraper, $3.00/1K) &mdash; Searches hashtags (product name with spaces removed). Returns up to 200 videos. Filters to videos with 10,000+ views, keeps top 20 by engagement.</li>
+    <li><strong>Pass 2</strong> (clockworks/tiktok-comments-scraper, $5.00/1K) &mdash; Fetches up to 50 comments per video from the top 20. Each comment scored for intent and sentiment.</li>
+  </ul>
+  <h4>What the signals mean</h4>
+  <table>
+    <tr><th>Signal</th><th>What It Tells You</th></tr>
+    <tr><td>View velocity</td><td>Views per post. 500K+ per video = viral reach. Scored via log scale.</td></tr>
+    <tr><td>Engagement per video</td><td>Average likes + comments per video. 5,000+ = strong engagement.</td></tr>
+    <tr><td>Creator tier score</td><td>Mix of creator sizes. Mega (&gt;1M followers) = 0.90, Macro (&gt;100K) = 0.75, Micro (&gt;10K) = 0.50, Nano = 0.20. Higher = more credible endorsements.</td></tr>
+    <tr><td>Comment intent</td><td>Average intent score from Pass 2 comments. Above 0.2 = meaningful purchase signals in the comments.</td></tr>
+  </table>
+
+  <h3>Instagram</h3>
+  <p><strong>Why it matters:</strong> Instagram confirms visual product discovery. Products performing well on Instagram alongside TikTok indicate cross-platform traction, not just single-platform virality.</p>
+  <h4>Two-Pass Architecture</h4>
+  <ul>
+    <li><strong>Pass 1</strong> (apify/instagram-hashtag-scraper, $2.30/1K) &mdash; Searches hashtags. Returns up to 200 posts. Filters to posts with 20+ engagement (likes + comments), keeps top 20.</li>
+    <li><strong>Pass 2</strong> (apify/instagram-comment-scraper, $2.30/1K) &mdash; Fetches up to 50 comments per post. Each comment scored for intent and sentiment.</li>
+  </ul>
+  <p><strong>Limitation:</strong> The hashtag scraper does not return follower counts, so creator tier score defaults to 0.5 (neutral).</p>
+
+  <h3>Amazon</h3>
+  <p><strong>Why it matters:</strong> Amazon is purchase confirmation. When a product has 100K+ reviews with 4.5+ stars and 90% satisfaction, you know real people are buying and happy. This is the strongest signal for sourcing decisions.</p>
+  <h4>Two-Pass Architecture</h4>
+  <ul>
+    <li><strong>Pass 1</strong> (junglee/amazon-crawler, $4.00/1K) &mdash; Keyword search with up to 30 results. Filters by min review count (default 500), sorts by reviews, keeps top 10.</li>
+    <li><strong>Pass 2</strong> &mdash; Fetches product detail pages for the top 10 ASINs. Extracts BSR (when available), rating distribution (5-star through 1-star percentages), and total ratings count.</li>
+  </ul>
+  <h4>What the signals mean</h4>
+  <table>
+    <tr><th>Signal</th><th>What It Tells You</th></tr>
+    <tr><td>Review count</td><td>Total reviews across top products. 50K+ = massive confirmed buyer base.</td></tr>
+    <tr><td>Review velocity</td><td>New reviews since last run. Positive = people are still buying.</td></tr>
+    <tr><td>Average rating</td><td>Star rating across top products. 4.5+ = buyers are satisfied.</td></tr>
+    <tr><td>Satisfaction score</td><td>Weighted distribution: 5&#9733;*1.0 + 4&#9733;*0.75 + 3&#9733;*0.5 + 2&#9733;*0.25 + 1&#9733;*0.0. Above 85 = very happy buyers.</td></tr>
+    <tr><td>1-star percentage</td><td>Proportion of negative reviews. Above 15% triggers a warning.</td></tr>
+    <tr><td>BSR trend</td><td>Bestseller rank direction. &ldquo;Rising&rdquo; = sales accelerating. &ldquo;Declining&rdquo; = sales slowing.</td></tr>
+  </table>
+  <div class="warn"><strong>Warning sign:</strong> If 1-star reviews increase by 3%+ week over week, the system fires an alert: &ldquo;Negative reviews increasing &mdash; quality issue possible.&rdquo; Investigate before sourcing.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 5 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch5">
+  <h2><span class="num">Chapter 5</span> &mdash; Daily Workflow</h2>
+
+  <h3>Every Morning (5 minutes)</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-text">Check the daily email in your inbox. Read the Intelligence Summary for each product &mdash; it tells you in plain English what the data means.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Look at score changes. If any product moved more than 5 points, dig deeper.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">Check the alerts section. If alerts fired, act on them or dismiss them.</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">If something needs investigation, open the dashboard and click into the product&rsquo;s scorecard.</div></div>
+  <p>Most days, the email is all you need. Only open the dashboard when something changed.</p>
+
+  <h3>Weekly Review (15 minutes)</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-text">Open the Leaderboard. Sort by score change to see which products are trending up.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Check the Discovery tab for new candidates. Add any that look promising.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">Review Research Council verdicts. Read the dissenting opinions for Watch-rated products.</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">Check the Alerts history for patterns. Multiple score-drop alerts on the same product = fading trend.</div></div>
+
+  <h3>When a Product Hits Watch</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-text">Open the scorecard. Check which jobs are active. If only 2/4, the score may go higher with more data.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Read the Intelligence Summary. Is the signal positive or mixed?</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">Check the Amazon section. Are real people buying and satisfied?</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">Check the Research Council. Did a majority vote Buy or Watch?</div></div>
+  <div class="step"><div class="step-num">5</div><div class="step-text">Wait for 2&ndash;3 more pipeline runs. If the score stays above 55 consistently, it&rsquo;s a real signal.</div></div>
+
+  <h3>When a Product Hits Buy</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-text">Verify all 4 jobs are active. A Buy verdict with only 2 jobs is less reliable than one with 4.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">Check the pre-sourcing checklist (Chapter 8). The system identifies demand &mdash; you verify viability.</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">Log your sourcing decision in the Sourcing Log tab. Record why you&rsquo;re sourcing (or not).</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">After 3&ndash;6 months, log the outcome. The learning system uses outcomes to improve future scoring.</div></div>
+
+  <h3>Adding a New Product</h3>
+  <div class="step"><div class="step-num">1</div><div class="step-text">Go to Products & Agents. Click Add Product.</div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Name:</strong> Use the product name as consumers would search for it (e.g., &ldquo;Korean Sheet Masks&rdquo;).</div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Keywords:</strong> Add 3&ndash;5 search variations. The first keyword is used for Amazon search. Examples: &ldquo;korean sheet mask,&rdquo; &ldquo;k-beauty face mask,&rdquo; &ldquo;sheet mask skincare.&rdquo;</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Hashtags:</strong> Auto-generated from keywords (spaces removed). Add any platform-specific hashtags.</div></div>
+  <div class="step"><div class="step-num">5</div><div class="step-text">First data appears after the next nightly run (1:00 AM). Scores become reliable after 3&ndash;5 runs as baselines are established and trends can be calculated.</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 6 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch6">
+  <h2><span class="num">Chapter 6</span> &mdash; The Pipeline</h2>
+
+  <h3>Nightly Schedule</h3>
+  <table>
+    <tr><th>Time</th><th>Phase</th><th>What Runs</th></tr>
+    <tr><td>1:00 AM</td><td>Wave 1</td><td>Google Trends, Reddit (Pass 1+2), TikTok (Pass 1+2), Instagram (Pass 1+2), Discovery agents</td></tr>
+    <tr><td>2:00 AM</td><td>Wave 2</td><td>Amazon (Pass 1+2), Alibaba, YouTube, Pinterest, X, Facebook, Walmart, Etsy</td></tr>
+    <tr><td>~3:00 AM</td><td>Scoring</td><td>Scoring engine recalculates all product scores from latest signal data</td></tr>
+    <tr><td>~3:15 AM</td><td>Council</td><td>Research Council deliberation (5 AI agents vote on each product)</td></tr>
+    <tr><td>~3:45 AM</td><td>Alerts</td><td>Alert engine checks all conditions and fires alerts</td></tr>
+    <tr><td>~3:50 AM</td><td>Email</td><td>Daily email sent to all active recipients</td></tr>
+    <tr><td>~4:15 AM</td><td>Learning</td><td>Learning pass adjusts internal weights based on sourcing outcomes</td></tr>
+  </table>
+
+  <h3>Phase Gating</h3>
+  <p>Each phase depends on the previous one succeeding:</p>
+  <ul>
+    <li>If Wave 1 fails, Wave 2 still runs (independent data)</li>
+    <li>If scoring fails, the Research Council is skipped (needs scores to deliberate)</li>
+    <li>Email always sends regardless of upstream failures (reports what data exists)</li>
+    <li>Every phase logs its status to the <code>pipeline_runs</code> table</li>
+  </ul>
+
+  <h3>What to Do If It Fails</h3>
+  <ol>
+    <li>Check the Agent Dashboard &mdash; look for red &ldquo;Failed&rdquo; badges</li>
+    <li>Check Run History for the specific error message</li>
+    <li>Common causes: Apify actor timeout, budget exceeded, API rate limit</li>
+    <li>Use &ldquo;Trigger Now&rdquo; to manually re-run a failed agent</li>
+  </ol>
+
+  <h3>Budget Management</h3>
+  <table>
+    <tr><th>Platform</th><th>Cost per Run</th><th>Actor</th></tr>
+    <tr><td>Reddit</td><td>~$0.15</td><td>macrocosmos/reddit-scraper + trudax/reddit-scraper-lite</td></tr>
+    <tr><td>TikTok</td><td>~$0.10</td><td>clockworks/tiktok-scraper + clockworks/tiktok-comments-scraper</td></tr>
+    <tr><td>Instagram</td><td>~$0.05</td><td>apify/instagram-hashtag-scraper + apify/instagram-comment-scraper</td></tr>
+    <tr><td>Amazon</td><td>~$0.06</td><td>junglee/amazon-crawler</td></tr>
+    <tr><td>Google Trends</td><td>Free</td><td>PyTrends (no API key needed)</td></tr>
+    <tr><td><strong>Total per product</strong></td><td><strong>~$0.36/night</strong></td><td></td></tr>
+    <tr><td><strong>5 products &times; 30 days</strong></td><td><strong>~$54/month</strong></td><td></td></tr>
+  </table>
+  <p>The budget guard checks Apify spend before each wave. If monthly spend exceeds 75% of the configured limit (default $29), a warning alert fires. At 90%, scraping is paused for the rest of the month.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 7 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch7">
+  <h2><span class="num">Chapter 7</span> &mdash; The Research Council</h2>
+  <p>The Research Council is a panel of 5 AI agents that independently analyze each product and vote Buy, Watch, or Pass. They use Claude Sonnet (claude-sonnet-4-20250514) with a 45-second timeout per agent.</p>
+
+  <h3>The 5 Agents</h3>
+  <table>
+    <tr><th>Agent</th><th>Role</th><th>What It Analyzes</th><th>What It Looks For</th></tr>
+    <tr><td><strong>Trend Archaeologist</strong></td><td>Pattern recognition expert</td><td>Historical data patterns, GT slope, social velocity curves</td><td>Products showing organic growth patterns similar to past winners. Looks for the &ldquo;hockey stick&rdquo; inflection point.</td></tr>
+    <tr><td><strong>Demand Validator</strong></td><td>Consumer behavior expert</td><td>Intent scores, sentiment, comment quality</td><td>Whether social buzz translates to real purchase intent. Separates genuine demand from noise and hype.</td></tr>
+    <tr><td><strong>Supply Chain Analyst</strong></td><td>Wholesale sourcing</td><td>Supplier count, MOQ, pricing, competition</td><td>Whether the product can be sourced profitably. Evaluates supplier landscape and margin viability.</td></tr>
+    <tr><td><strong>Fad Detector</strong></td><td>Contrarian analyst</td><td>Velocity vs sustainability, breakout flags</td><td>Whether the trend will last 6+ months or flame out. Looks for warning signs of unsustainable hype.</td></tr>
+    <tr><td><strong>Category Strategist</strong></td><td>Lifecycle timing expert</td><td>Phase classification, category saturation</td><td>Whether the timing is right. Is the category growing, mature, or saturated? Is there room for a new entrant?</td></tr>
+  </table>
+
+  <h3>How Voting Works</h3>
+  <ul>
+    <li><strong>Round 1:</strong> All 5 agents independently analyze the data and cast a vote with written reasoning.</li>
+    <li><strong>Round 2 (if split):</strong> When votes are split (e.g., 3-2), agents enter a debate round where they respond to dissenting arguments.</li>
+    <li><strong>All-abstain:</strong> If no agent feels confident enough to vote, the verdict is &ldquo;insufficient_data.&rdquo;</li>
+  </ul>
+
+  <h4>Reading the results</h4>
+  <ul>
+    <li><strong>Unanimous Buy (5-0-0):</strong> All agents agree this is a strong opportunity. Strongest possible signal.</li>
+    <li><strong>Majority Buy (3-1-1 or 4-1-0):</strong> Most agents positive, but read the dissent carefully &mdash; the contrarian may see a risk others missed.</li>
+    <li><strong>Split (2-2-1):</strong> Genuinely uncertain. This is a Watch product &mdash; wait for more data.</li>
+    <li><strong>Unanimous Pass (0-0-5):</strong> All agents agree this is not a good opportunity. Strong avoid signal.</li>
+  </ul>
+
+  <h3>Victor Override</h3>
+  <p>As the Owner, you can submit your own vote that carries 1.5x weight. Use this when:</p>
+  <ul>
+    <li>You have industry knowledge the AI doesn&rsquo;t (e.g., you know a competitor just exited this category)</li>
+    <li>You&rsquo;ve sourced similar products before and know the margin structure</li>
+    <li>You disagree with the Council&rsquo;s assessment based on information not in the data</li>
+  </ul>
+  <p>Your override is logged and contributes to the learning system. Over time, the formula adjusts to align with your judgment.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 8 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch8">
+  <h2><span class="num">Chapter 8</span> &mdash; Making Sourcing Decisions</h2>
+
+  <h3>What the System Is Not</h3>
+  <ul>
+    <li>Not a guarantee. A Buy verdict means strong signals, not guaranteed profit.</li>
+    <li>Not a replacement for your judgment. The system identifies demand &mdash; you evaluate viability.</li>
+    <li>Not accounting for your specific constraints (capital, warehouse space, existing inventory, supplier relationships).</li>
+  </ul>
+
+  <h3>What the System Is</h3>
+  <ul>
+    <li>A <strong>signal aggregator</strong> that saves you hours of manual research every day.</li>
+    <li>A <strong>trend detector</strong> that spots opportunities before they become obvious.</li>
+    <li>A <strong>confidence builder</strong> that tells you when multiple independent data sources agree.</li>
+    <li>A <strong>time saver</strong> that filters out noise and surfaces only actionable opportunities.</li>
+  </ul>
+
+  <h3>Decision Framework</h3>
+  <table>
+    <tr><th>Scenario</th><th>Action</th></tr>
+    <tr><td>Score 75+ (Buy) AND 4/4 jobs active</td><td><strong>Investigate seriously.</strong> All signals align. Check suppliers, margins, and competition. This is the strongest signal the system produces.</td></tr>
+    <tr><td>Score 55&ndash;74 (Watch) AND 3/4 jobs active</td><td><strong>Monitor closely.</strong> The signal is promising but not fully confirmed. Wait for the missing job&rsquo;s data and 2&ndash;3 more pipeline runs.</td></tr>
+    <tr><td>Score 55&ndash;74 (Watch) AND 2/4 jobs active</td><td><strong>Insufficient data.</strong> The raw score may be high but coverage is too low. Activate more scrapers and wait.</td></tr>
+    <tr><td>Score below 55 (Pass)</td><td><strong>Not yet.</strong> Either the signals are weak or there isn&rsquo;t enough data. Revisit in 30 days.</td></tr>
+  </table>
+
+  <h3>Pre-Sourcing Checklist</h3>
+  <p>Before sourcing any product the system recommends, verify these 10 items outside the system:</p>
+  <ol>
+    <li><strong>Supplier verification</strong> &mdash; Do you have a reliable supplier with quality samples?</li>
+    <li><strong>MOQ feasibility</strong> &mdash; Can you meet the minimum order quantity?</li>
+    <li><strong>Margin analysis</strong> &mdash; Landed cost vs selling price. Is there enough margin after shipping, duties, and fees?</li>
+    <li><strong>Competition assessment</strong> &mdash; How many sellers already offer this on your target channels?</li>
+    <li><strong>Regulatory check</strong> &mdash; FDA, labeling requirements, ingredient restrictions for your market.</li>
+    <li><strong>Shipping logistics</strong> &mdash; Weight, fragility, shelf life. Can you import it efficiently?</li>
+    <li><strong>Brand differentiation</strong> &mdash; What makes your version different from existing options?</li>
+    <li><strong>Capital available</strong> &mdash; Do you have the capital to fund the initial order?</li>
+    <li><strong>Timeline</strong> &mdash; How long from order to shelf? Will the trend still be active?</li>
+    <li><strong>Exit strategy</strong> &mdash; If it doesn&rsquo;t sell, can you liquidate without a total loss?</li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CHAPTER 9 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="chapter" id="ch9">
+  <h2><span class="num">Chapter 9</span> &mdash; System Administration</h2>
+
+  <h3>Adding New Users</h3>
+  <p>Go to Settings &rarr; Users. Add the user&rsquo;s email and assign a role:</p>
+  <table>
+    <tr><th>Role</th><th>Access Level</th></tr>
+    <tr><td><strong>Owner</strong></td><td>Full access. Formula Studio, Settings, user management, all data.</td></tr>
+    <tr><td><strong>Analyst</strong></td><td>Can view all data, manage products, track brands/competitors, log sourcing. Cannot modify formula or system settings.</td></tr>
+    <tr><td><strong>Viewer</strong></td><td>Read-only. Leaderboard, Discovery, Posts, Council, Alerts. Good for partners.</td></tr>
+  </table>
+  <p>Authentication is handled by Supabase Auth. Users sign in with email and password.</p>
+
+  <h3>Adjusting the Formula</h3>
+  <ol>
+    <li>Go to Formula Studio (Owner only).</li>
+    <li>Adjust job weights or signal weights. Changes are saved immediately.</li>
+    <li>Click &ldquo;Recompute All Scores&rdquo; to see the impact across all products.</li>
+    <li>If scores look wrong, revert the weights. The previous values are logged.</li>
+  </ol>
+  <div class="warn"><strong>Best practice:</strong> Make one change at a time. Adjust a single weight by 5%, recompute, and evaluate the impact before making another change.</div>
+
+  <h3>Activating New Scrapers</h3>
+  <p>To activate a platform that&rsquo;s currently &ldquo;pending&rdquo; (YouTube, X, Facebook, Walmart, Etsy, Alibaba, Pinterest):</p>
+  <ol>
+    <li>Ensure the required API credential is set in <code>agents/.env</code></li>
+    <li>Set the platform&rsquo;s schedule to enabled in the <code>schedules</code> table</li>
+    <li>Update the scraper registry entry to &ldquo;active&rdquo; status</li>
+    <li>Trigger a manual run to test before the nightly pipeline picks it up</li>
+  </ol>
+
+  <h3>Deploying to the Cloud</h3>
+  <p>Currently the Python backend runs on your local machine. For 24/7 operation:</p>
+  <ul>
+    <li><strong>Railway or Render</strong> &mdash; Deploy the FastAPI server + scheduler. Estimated cost: $5&ndash;15/month.</li>
+    <li><strong>Dashboard</strong> &mdash; Already deployed on Vercel (free tier).</li>
+    <li><strong>Database</strong> &mdash; Supabase free tier handles current volume. Upgrade if you exceed 500MB.</li>
+  </ul>
+
+  <h3>Backup and Recovery</h3>
+  <ul>
+    <li><strong>Supabase</strong> automatically backs up the database daily (paid plan). On the free plan, use Supabase&rsquo;s point-in-time recovery.</li>
+    <li><strong>Dashboard code</strong> is in GitHub at <code>Victorb11-hub/product-intelligence-dashboard</code>.</li>
+    <li><strong>Agent code</strong> is in the <code>agents/</code> folder on your local machine. Consider initializing a Git repository for version control.</li>
+    <li><strong>If data is lost</strong>, the system can rebuild from scratch by re-running the pipeline. Historical snapshots would be lost, but current signals regenerate overnight.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- END -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div style="text-align:center;padding:32px;color:#9ca3af;font-size:13px;border-top:1px solid var(--border);margin-top:16px;">
+  <p><strong>Product Intelligence System</strong></p>
+  <p>Built for Evolution Equities LLC</p>
+  <p style="font-size:11px;margin-top:8px;">Version 1.0 &mdash; April 2026</p>
+</div>
+
+</div>
+</body>
+</html>

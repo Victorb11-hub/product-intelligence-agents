@@ -1,0 +1,39 @@
+2026-04-16 12:16:39,800 [httpx] INFO: HTTP Request: GET https://yvzuyaemgrlhpsnfqjqv.supabase.co/rest/v1/products?select=%2A&id=eq.f0620e1e-83fd-45c9-ac92-dd922e4c674c "HTTP/2 200 OK"
+============================================================
+BASELINE
+============================================================
+2026-04-16 12:16:40,074 [httpx] INFO: HTTP Request: GET https://yvzuyaemgrlhpsnfqjqv.supabase.co/rest/v1/posts?select=id&product_id=eq.f0620e1e-83fd-45c9-ac92-dd922e4c674c "HTTP/2 200 OK"
+2026-04-16 12:16:40,275 [httpx] INFO: HTTP Request: GET https://yvzuyaemgrlhpsnfqjqv.supabase.co/rest/v1/comments?select=id&product_id=eq.f0620e1e-83fd-45c9-ac92-dd922e4c674c "HTTP/2 200 OK"
+  score: 44.4
+  raw_score: 50.8
+  verdict: pass
+  confidence: medium
+  confidence_reason: Medium: 1,000 comments across 5 platforms. Need 4,000 more comments and reduce negative ratio (currently 25.0%) for High.
+  total_comments: 1000
+  platforms: 5
+  last_scraped: 2026-04-16T15:03:26.170967+00:00
+  posts_count: 1000
+  comments_count: 1000
+
+run_id: 5205fbd2-a015-4259-a0bf-0dd2ff417f17
+
+
+============================================================
+REDDIT STARTING
+============================================================
+2026-04-16 12:16:41,076 [httpx] INFO: HTTP Request: GET https://yvzuyaemgrlhpsnfqjqv.supabase.co/rest/v1/product_hashtags?select=hashtag%2Cpriority&product_id=eq.f0620e1e-83fd-45c9-ac92-dd922e4c674c&platform=eq.reddit&active=eq.True&order=priority.asc "HTTP/2 200 OK"
+2026-04-16 12:16:41,077 [agents.base_platform_agent] INFO: [hashtags] Loaded 12 hashtags for Korean Sheet Masks on reddit from database
+2026-04-16 12:16:41,077 [agents.agent_reddit] INFO: [reddit pass1] Searching 12 subreddits for ['Korean Sheet Masks', 'korean sheet mask', 'K-beauty'] (lookback=90 days)
+2026-04-16 12:16:41,077 [agents.agent_reddit] INFO: [reddit pass1] Querying 24 search URLs across 12 subreddits
+2026-04-16 12:16:41,361 [agents.skills.apify_helper] INFO: Starting Apify actor: trudax/reddit-scraper-lite
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> Status: RUNNING, Message: 
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:41.869Z ACTOR: Pulling container image of build KgRZPY6MMR1psZ2cr from registry.
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:41.872Z ACTOR: Creating container.
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:41.971Z ACTOR: Starting container.
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:41.972Z ACTOR: Running under "LIMITED_PERMISSIONS" permission level.
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:42.149Z Running on architecture: x86_64
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:42.149Z Will run command: xvfb-run -a -s "-ac -screen 0 1920x1080x24+32 -nolisten tcp" /bin/sh -c npm start --silent
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:43.328Z [32mINFO[39m  System info[90m {"apifyVersion":"3.7.0","apifyClientVersion":"2.22.3","crawleeVersion":"3.16.0","osType":"Linux","nodeVersion":"v20.20.1"}[39m
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:43.426Z [32mINFO[39m  Found startUrl. Search params will be ignored.
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> 2026-04-16T16:16:44.077Z [32mINFO[39m  Starting the crawl.
+[36m[apify.reddit-scraper-lite runId:RxFVFvQv7wcWPTHU4][0m -> Status: RUNNING, Message: Starting the crawler.

@@ -1,15 +1,23 @@
 """
-TikTok Agent — clockworks/tiktok-scraper ($3.00/1K)
-Searches TikTok by keyword and hashtag. Extracts video engagement,
-creator tiers, view velocity, and comment text for intent scoring.
+TikTok Agent — Two-pass architecture using BasePlatformAgent.
+  Pass 1: clockworks/tiktok-scraper — metadata only (maxCommentsPerPost=0)
+  Pass 2: clockworks/tiktok-comments-scraper — deep comments on top posts
+All thresholds from .env. Hashtags from product_hashtags table.
 Feeds Job 1 — Early Detection (40% weight).
-"""
-import logging
-from datetime import date, datetime, timezone
 
-from .base_agent import BaseAgent
+Field mappings confirmed from actor discovery:
+  id, webVideoUrl, createTime (unix int), createTimeISO,
+  playCount, diggCount, commentCount, shareCount,
+  text (caption), hashtags [{name: ...}], authorMeta {fans, name, ...}
+"""
+import math
+import logging
+import time
+from datetime import date, datetime, timedelta, timezone
+
+from .base_platform_agent import BasePlatformAgent, _env_int, _env_float
 from .config import APIFY_API_TOKEN, APIFY_ACTORS
-from .skills.apify_helper import run_actor, extract_texts, extract_dates
+from .skills.apify_helper import run_actor
 
 logger = logging.getLogger(__name__)
 
@@ -21,130 +29,310 @@ CREATOR_TIERS = [
 ]
 
 
-class TikTokAgent(BaseAgent):
+class TikTokAgent(BasePlatformAgent):
     PLATFORM = "tiktok"
     SIGNAL_TABLE = "signals_social"
     REQUIRED_CREDENTIALS = ["APIFY_API_TOKEN"]
 
     def scrape(self, product_name: str, keywords: list, product: dict) -> dict:
-        all_terms = [product_name] + (keywords or [])
-        # Build hashtag versions (no spaces, no special chars)
-        hashtags = list(set(
-            t.lower().replace(" ", "").replace("-", "").replace("&", "")
-            for t in all_terms[:7] if t and len(t) > 3
-        ))
+        """Main entry point — called by BaseAgent pipeline."""
+        start = time.time()
 
-        logger.info("[tiktok] Searching %d hashtags: %s", len(hashtags), hashtags)
+        hashtags = self.get_hashtags(product)
+        if not hashtags:
+            hashtags = [product_name.lower().replace(" ", "")]
+            logger.warning("[tiktok] No hashtags in DB — using product name: %s", hashtags)
 
-        all_items = []
+        lookback = self.get_lookback_days(product)
+        is_backfill = not product.get("backfill_completed")
+
+        # ═══════════════════════════════════════
+        # PASS 1 — Metadata discovery (no comments)
+        # ═══════════════════════════════════════
+        try:
+            pass1_items = self.run_pass1(product, hashtags, lookback)
+        except Exception as e:
+            logger.error("[tiktok] Pass 1 FAILED: %s", str(e)[:300])
+            return self._error_result(hashtags, str(e), time.time() - start)
+
+        filtered = self.filter_pass1(pass1_items, lookback)
+        top_n = _env_int("PASS2_POST_LIMIT", 20)
+        top_posts = filtered[:top_n]
+
+        self.log_run(1, {
+            "total_found": len(pass1_items),
+            "passed_filter": len(filtered),
+            "kept": len(top_posts),
+        })
+
+        if not top_posts:
+            logger.warning("[tiktok] No posts passed filters — skipping Pass 2")
+            return self._empty_result(hashtags, len(pass1_items), time.time() - start)
+
+        # Aggregate Pass 1 metrics
+        total_views = sum(p.get("playCount") or 0 for p in top_posts)
+        total_likes = sum(p.get("diggCount") or 0 for p in top_posts)
+        total_comments_count = sum(p.get("commentCount") or 0 for p in top_posts)
+        total_shares = sum(p.get("shareCount") or 0 for p in top_posts)
+
+        # Creator tier scoring
+        creator_scores = []
+        for p in pass1_items:
+            author = p.get("authorMeta") or {}
+            fans = author.get("fans") or 0
+            for threshold, score, _ in CREATOR_TIERS:
+                if fans >= threshold:
+                    creator_scores.append(score)
+                    break
+        avg_creator = sum(creator_scores) / max(len(creator_scores), 1) if creator_scores else 0.3
+
+        # ═══════════════════════════════════════
+        # PASS 2 — Deep comments on winners
+        # ═══════════════════════════════════════
+        post_urls = [p.get("webVideoUrl") or "" for p in top_posts]
+        post_urls = [u for u in post_urls if u]
+
+        try:
+            comments = self.run_pass2(post_urls, product)
+        except Exception as e:
+            logger.error("[tiktok] Pass 2 FAILED: %s", str(e)[:300])
+            comments = []
+
+        # Score comments with parent virality weighting
+        all_scored = []
+        post_results = []
+        for post in top_posts:
+            views = post.get("playCount") or 1
+            parent_virality = math.log10(max(views, 1) + 1)
+
+            post_url = post.get("webVideoUrl") or ""
+            post_comments = [c for c in comments if
+                             (c.get("videoWebUrl") or c.get("submittedVideoUrl") or "") == post_url]
+
+            scored = self.score_comments(post_comments, parent_virality)
+
+            likes = post.get("diggCount") or 0
+            cmts = post.get("commentCount") or 0
+            shares = post.get("shareCount") or 0
+            eng_rate = (likes + cmts + shares) / max(views, 1) * 100
+
+            top_comment = ""
+            if scored["scored_comments"]:
+                top_c = max(scored["scored_comments"], key=lambda c: c.get("_intent_score", 0))
+                top_comment = (top_c.get("text") or "")[:150]
+
+            post_results.append({
+                "url": post_url,
+                "views": views,
+                "likes": likes,
+                "comment_count": cmts,
+                "shares": shares,
+                "engagement_rate": round(eng_rate, 2),
+                "caption_snippet": (post.get("text") or "")[:100],
+                "top_comment": top_comment,
+                "purchase_signals": scored["purchase_signal_count"],
+                "negative_signals": scored["negative_signal_count"],
+            })
+
+            all_scored.extend(scored["scored_comments"])
+
+        # Aggregate all scored comments
+        total_stats = self.score_comments(
+            [{"text": c.get("text") or c.get("body") or c.get("comment_body") or "", **c}
+             for c in all_scored if c.get("text") or c.get("body") or c.get("comment_body")],
+            parent_virality=1.0
+        )
+
+        # Write comments to DB with dedup
+        written = self.write_comments_to_db(all_scored, product["id"])
+        logger.info("[tiktok] Wrote %d comments to DB", written)
+
+        self.log_run(2, {
+            "comment_count_total": total_stats["comment_count_total"],
+            "posts_enriched": len(top_posts),
+            "purchase_signal_count": total_stats["purchase_signal_count"],
+            "negative_signal_count": total_stats["negative_signal_count"],
+            "question_signal_count": total_stats["question_signal_count"],
+        })
+
+        self.update_confidence(product["id"])
+        self.update_product_scrape_tracking(product)
+
+        elapsed = time.time() - start
+
+        # Texts for BaseAgent pipeline
+        texts = [(p.get("text") or "")[:200] for p in top_posts if p.get("text")]
+
+        return {
+            "texts": texts,
+            "raw_items": top_posts,
+            "data_dates": [date.today().isoformat()],
+            "mention_count": len(top_posts),
+            "platform": "tiktok",
+            "pass1_total": len(pass1_items),
+            "pass1_passed": len(filtered),
+            "pass2_posts": len(top_posts),
+            "pass2_comments": total_stats["comment_count_total"],
+            "purchase_signals": total_stats["purchase_signal_count"],
+            "negative_signals": total_stats["negative_signal_count"],
+            "question_signals": total_stats["question_signal_count"],
+            "avg_weighted_intent": round(total_stats["weighted_comment_intent"], 4),
+            "weighted_sentiment": round(total_stats["weighted_sentiment"], 4),
+            "high_intent_count": total_stats["high_intent_count"],
+            "hashtags_searched": hashtags,
+            "top_posts": post_results[:10],
+            "duration_seconds": round(elapsed, 1),
+            "error": None,
+            # Metrics for signal row / scoring engine
+            "total_views": total_views,
+            "total_likes": total_likes,
+            "total_comments": total_comments_count,
+            "total_shares": total_shares,
+            "creator_tier_score": round(avg_creator, 4),
+            "buy_intent_comment_count": total_stats["purchase_signal_count"],
+            "problem_language_comment_count": total_stats["negative_signal_count"],
+            "growth_rate_wow": 0,
+            "avg_view_velocity": 0,
+            "repeat_purchase_pct": 0,
+        }
+
+    # ─── Pass 1: Metadata discovery (no comments) ───
+
+    def run_pass1(self, product: dict, hashtags: list[str], lookback_days: int) -> list[dict]:
+        """Pull lightweight metadata — no comments."""
+        max_hashtags = _env_int("TIKTOK_MAX_HASHTAGS", 15)
+        results_per_page = _env_int("TIKTOK_RESULTS_PER_PAGE", 50)
+        timeout = _env_int("TIKTOK_PASS1_TIMEOUT", 240)
+        max_items = _env_int("TIKTOK_PASS1_MAX_ITEMS", 200)
+
+        tags = hashtags[:max_hashtags]
+
+        logger.info("[tiktok pass1] Searching %d hashtags, %d results/page, no comments",
+                    len(tags), results_per_page)
+
         try:
             items = run_actor(
                 actor_id=APIFY_ACTORS["tiktok"],
                 run_input={
-                    "hashtags": hashtags,
-                    "resultsPerPage": 50,
+                    "hashtags": tags,
+                    "resultsPerPage": results_per_page,
+                    "maxCommentsPerPost": 0,
                 },
                 api_token=APIFY_API_TOKEN,
-                timeout_secs=240,
-                max_items=200,
+                timeout_secs=timeout,
+                max_items=max_items,
             )
-            all_items.extend(items)
         except Exception as e:
-            logger.warning("[tiktok] Hashtag search failed: %s", str(e)[:200])
+            logger.error("[tiktok pass1] Actor failed: %s", str(e)[:300])
+            raise
 
-        if not all_items:
-            raise ValueError(f"No TikTok data found for {product_name}")
-
-        # Data ingestion filter: remove old + duplicate items
-        from .skills.data_ingestion import DataIngestionFilter
-        ingestion = DataIngestionFilter(self.supabase)
-        all_items, ingestion_stats = ingestion.get_new_items_only(
-            all_items, "tiktok", product["id"], lookback_days=14
-        )
-        self.ingestion_stats = ingestion_stats if hasattr(self, 'ingestion_stats') else ingestion_stats
-
-        if not all_items:
-            raise ValueError(f"All TikTok items were old or duplicates for {product_name}")
-
-        # Deduplicate by video ID
+        # Dedup by video ID
         seen = set()
         unique = []
-        for item in all_items:
+        for item in items:
             vid = item.get("id", "")
             if vid and vid in seen:
                 continue
             seen.add(vid)
             unique.append(item)
 
-        # Extract texts for sentiment + intent
-        texts = []
-        for item in unique:
-            text = (item.get("text") or item.get("desc") or item.get("description") or "").strip()
-            if text:
-                texts.append(text)
+        logger.info("[tiktok pass1] %d items returned, %d unique after dedup", len(items), len(unique))
+        return unique
 
-        dates = [item.get("createTimeISO") or item.get("createdAt") or "" for item in unique]
+    def filter_pass1(self, items: list[dict], lookback_days: int) -> list[dict]:
+        """Filter by date, views, comment count. Sort by engagement."""
+        min_views = _env_int("MIN_VIEWS_TIKTOK", 50000)
+        cutoff = self.get_lookback_cutoff(lookback_days)
 
-        # Engagement metrics
-        total_views = sum(item.get("playCount", 0) or 0 for item in unique)
-        total_likes = sum(item.get("diggCount", 0) or 0 for item in unique)
-        total_comments = sum(item.get("commentCount", 0) or 0 for item in unique)
-        total_shares = sum(item.get("shareCount", 0) or 0 for item in unique)
-
-        # View velocity: views per hour since creation
-        velocities = []
-        now = datetime.now(timezone.utc)
-        for item in unique:
+        filtered = []
+        for item in items:
+            # Date filter
             ct = item.get("createTime")
-            views = item.get("playCount", 0) or 0
-            if ct and isinstance(ct, (int, float)) and ct > 1_000_000_000 and views > 0:
+            if ct and isinstance(ct, (int, float)) and ct > 1_000_000_000:
                 created = datetime.fromtimestamp(ct, tz=timezone.utc)
-                hours = max(1, (now - created).total_seconds() / 3600)
-                velocities.append(views / hours)
+                if created < cutoff:
+                    continue
+            elif item.get("createTimeISO"):
+                try:
+                    created = datetime.fromisoformat(item["createTimeISO"].replace("Z", "+00:00"))
+                    if created < cutoff:
+                        continue
+                except Exception:
+                    pass
 
-        avg_velocity = sum(velocities) / max(len(velocities), 1) if velocities else 0
+            views = item.get("playCount") or 0
+            comments = item.get("commentCount") or 0
 
-        # Creator tier scoring
-        creator_scores = []
-        tier_dist = {"nano": 0, "micro": 0, "macro": 0, "mega": 0}
-        for item in unique:
-            author = item.get("authorMeta") or item.get("author") or {}
-            if isinstance(author, dict):
-                fans = author.get("fans", 0) or author.get("followers", 0) or 0
-            else:
-                fans = 0
-            for threshold, score, tier_name in CREATOR_TIERS:
-                if fans >= threshold:
-                    creator_scores.append(score)
-                    tier_dist[tier_name] += 1
-                    break
+            if views < min_views:
+                continue
+            if comments <= 0:
+                continue
 
-        avg_creator = sum(creator_scores) / max(len(creator_scores), 1) if creator_scores else 0.3
+            # Skip ads/sponsored
+            if item.get("isAd") or item.get("isSponsored"):
+                continue
 
-        # Growth rate
-        hist = self.supabase.table("signals_social") \
-            .select("mention_count").eq("product_id", product["id"]) \
-            .eq("platform", "tiktok").order("scraped_date", desc=True).limit(1).execute()
-        prev = hist.data[0]["mention_count"] if hist.data else len(unique)
-        growth = (len(unique) - prev) / max(prev, 1)
+            filtered.append(item)
 
-        return {
-            "texts": texts,
-            "raw_items": unique,
-            "data_dates": dates,
-            "mention_count": len(unique),
-            "growth_rate_wow": round(growth, 4),
-            "total_views": total_views,
-            "total_likes": total_likes,
-            "total_comments": total_comments,
-            "total_shares": total_shares,
-            "avg_view_velocity": round(avg_velocity, 2),
-            "creator_tier_score": round(avg_creator, 4),
-            "creator_tier_distribution": tier_dist,
-            "buy_intent_comment_count": 0,
-            "problem_language_comment_count": 0,
-            "repeat_purchase_pct": 0,
-        }
+        # Sort: primary by commentCount desc, secondary by engagement rate
+        def sort_key(p):
+            views = max(p.get("playCount") or 1, 1)
+            likes = p.get("diggCount") or 0
+            cmts = p.get("commentCount") or 0
+            shares = p.get("shareCount") or 0
+            eng_rate = (likes + cmts + shares) / views
+            return (cmts, eng_rate)
+
+        filtered.sort(key=sort_key, reverse=True)
+
+        logger.info("[tiktok pass1] %d passed filters (min %d views, comments > 0, %d day window)",
+                    len(filtered), min_views, lookback_days)
+        return filtered
+
+    # ─── Pass 2: Deep comments on winners ───
+
+    def run_pass2(self, top_posts: list[dict], product: dict) -> list[dict]:
+        """Pull comments from top videos using dedicated comments actor."""
+        post_urls = top_posts if isinstance(top_posts[0], str) else [
+            p.get("webVideoUrl") or "" for p in top_posts
+        ]
+        post_urls = [u for u in post_urls if u]
+
+        if not post_urls:
+            return []
+
+        comments_per = _env_int("PASS2_COMMENTS_PER_POST", 50)
+        replies_per = _env_int("PASS2_REPLIES_PER_COMMENT", 10)
+        timeout = _env_int("TIKTOK_PASS2_TIMEOUT", 300)
+        max_items = _env_int("TIKTOK_PASS2_MAX_ITEMS", 1500)
+
+        logger.info("[tiktok pass2] Fetching comments from %d videos (%d comments/post)",
+                    len(post_urls), comments_per)
+
+        try:
+            items = run_actor(
+                actor_id=APIFY_ACTORS["tiktok_comments"],
+                run_input={
+                    "postURLs": post_urls,
+                    "commentsPerPost": comments_per,
+                    "maxRepliesPerComment": replies_per,
+                },
+                api_token=APIFY_API_TOKEN,
+                timeout_secs=timeout,
+                max_items=max_items,
+            )
+        except Exception as e:
+            logger.error("[tiktok pass2] Actor failed: %s", str(e)[:300])
+            raise
+
+        # All items from tiktok-comments-scraper are comments (skip errors)
+        comments = [item for item in items if item.get("text") and not item.get("error")]
+
+        logger.info("[tiktok pass2] %d items returned, %d valid comments",
+                    len(items), len(comments))
+        return comments
+
+    # ─── Signal row builder ───
 
     def build_signal_row(self, raw_data: dict, product_id: str) -> dict:
         return {
@@ -157,8 +345,41 @@ class TikTokAgent(BaseAgent):
             "creator_tier_score": raw_data.get("creator_tier_score", 0),
             "buy_intent_comment_count": raw_data.get("buy_intent_comment_count", 0),
             "problem_language_comment_count": raw_data.get("problem_language_comment_count", 0),
+            "high_intent_comment_count": raw_data.get("high_intent_count", 0),
+            "avg_intent_score": raw_data.get("avg_weighted_intent", 0),
             "total_upvotes": raw_data.get("total_likes", 0),
             "total_comment_count": raw_data.get("total_comments", 0),
             "total_views": raw_data.get("total_views", 0),
             "sample_size": raw_data.get("mention_count", 0),
+            "purchase_signal_count": raw_data.get("purchase_signals", 0),
+            "negative_signal_count": raw_data.get("negative_signals", 0),
+            "question_signal_count": raw_data.get("question_signals", 0),
+            "comment_count_total": raw_data.get("pass2_comments", 0),
+            "weighted_comment_intent": raw_data.get("avg_weighted_intent", 0),
+            "weighted_sentiment": raw_data.get("weighted_sentiment", 0),
+            "lookback_days": self.get_lookback_days({"backfill_completed": True}),
+            "is_backfill": False,
         }
+
+    # ─── Helpers ───
+
+    def _error_result(self, hashtags, error_msg, elapsed):
+        return {
+            "texts": [], "raw_items": [], "data_dates": [],
+            "mention_count": 0, "platform": "tiktok",
+            "pass1_total": 0, "pass1_passed": 0,
+            "pass2_posts": 0, "pass2_comments": 0,
+            "purchase_signals": 0, "negative_signals": 0, "question_signals": 0,
+            "avg_weighted_intent": 0, "weighted_sentiment": 0, "high_intent_count": 0,
+            "hashtags_searched": hashtags, "top_posts": [],
+            "duration_seconds": round(elapsed, 1), "error": error_msg,
+            "total_views": 0, "total_likes": 0, "total_comments": 0, "total_shares": 0,
+            "creator_tier_score": 0, "buy_intent_comment_count": 0,
+            "problem_language_comment_count": 0, "growth_rate_wow": 0,
+            "avg_view_velocity": 0, "repeat_purchase_pct": 0,
+        }
+
+    def _empty_result(self, hashtags, total_found, elapsed):
+        result = self._error_result(hashtags, None, elapsed)
+        result["pass1_total"] = total_found
+        return result

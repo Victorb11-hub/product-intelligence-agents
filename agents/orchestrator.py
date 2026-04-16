@@ -59,13 +59,14 @@ def _register_agents():
     }
 
 
-async def run_all(platforms: list[str] = None) -> dict:
+async def run_all(platforms: list[str] = None, run_id: str = None) -> dict:
     """
     Execute a full orchestrator run.
 
     Args:
         platforms: Optional list of specific platforms to run.
                   If None, runs all enabled platforms from schedules table.
+        run_id: Optional run ID from the caller. If None, generates a new one.
 
     Returns:
         Summary dict with run_id and per-platform results.
@@ -74,7 +75,7 @@ async def run_all(platforms: list[str] = None) -> dict:
 
     _register_agents()
     supabase = get_supabase()
-    run_id = str(uuid.uuid4())
+    run_id = run_id or str(uuid.uuid4())
     post_status("scraper-orchestrator", "busy", f"Starting orchestrator run {run_id[:8]}")
 
     logger.info("=== ORCHESTRATOR RUN %s STARTED ===", run_id)
@@ -183,6 +184,6 @@ async def run_all(platforms: list[str] = None) -> dict:
     }
 
 
-async def run_single(platform: str) -> dict:
+async def run_single(platform: str, run_id: str = None) -> dict:
     """Run a single platform agent."""
-    return await run_all(platforms=[platform])
+    return await run_all(platforms=[platform], run_id=run_id)

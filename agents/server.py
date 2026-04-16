@@ -42,7 +42,7 @@ def _start_scheduler():
         from scheduler import create_scheduler
         _scheduler = create_scheduler()
         _scheduler.start()
-        job = _scheduler.get_job("nightly_pipeline")
+        job = _scheduler.get_job("weekly_pipeline")
         next_run = job.next_run_time if job else "unknown"
         logger.info("Scheduler started inside API server. Next run: %s", next_run)
     except Exception as e:
@@ -64,16 +64,16 @@ app.add_middleware(
 _active_runs: dict[str, dict] = {}
 
 
-def _run_async_in_thread(coro_func, *args, run_id: str = ""):
+def _run_async_in_thread(coro_func, *args, run_id: str = "", **kwargs):
     """
     Run an async function in a new thread with its own event loop.
-    Fixes 'no current event loop' error on Windows background threads.
+    Passes run_id through to the coroutine so agent_runs table gets the correct ID.
     """
     def _worker():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            result = loop.run_until_complete(coro_func(*args))
+            result = loop.run_until_complete(coro_func(*args, run_id=run_id, **kwargs))
             _active_runs[run_id] = {**result, "completed_at": datetime.now().isoformat()}
         except Exception as e:
             logger.error("Agent run %s failed: %s", run_id, e)
@@ -130,6 +130,20 @@ async def trigger_single_run(platform: str):
         status="started",
         message=f"{platform} agent started in background",
     )
+
+
+@app.post("/email/test")
+async def send_test_email():
+    """Trigger a test email with current data."""
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from reporters.daily_email import send_daily_report
+    supabase = get_supabase()
+    try:
+        sent = send_daily_report(supabase)
+        return {"status": "sent", "recipients": sent}
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:500]}
 
 
 @app.get("/status")
@@ -263,19 +277,58 @@ async def run_backtest_endpoint(keyword: str = "", start_date: str = "", end_dat
 
 @app.get("/scheduler/status")
 async def scheduler_status():
-    """Get the current scheduler state and next run time."""
-    if not _scheduler:
-        return {"active": False, "next_run": "Scheduler not started", "state": "stopped"}
+    """Get the current scheduler state, schedule, next run, and last run from DB."""
+    day = os.environ.get("PIPELINE_SCHEDULE_DAY_OF_WEEK", "sun")
+    hour = int(os.environ.get("PIPELINE_SCHEDULE_HOUR", "1"))
+    minute = int(os.environ.get("PIPELINE_SCHEDULE_MINUTE", "0"))
+    day_full = {"mon": "Monday", "tue": "Tuesday", "wed": "Wednesday", "thu": "Thursday",
+                "fri": "Friday", "sat": "Saturday", "sun": "Sunday"}.get(day, day.title())
+    schedule_str = f"Weekly — {day_full}s at {hour:02d}:{minute:02d}"
 
-    job = _scheduler.get_job("nightly_pipeline")
+    base = {
+        "running": False, "active": False, "state": "stopped",
+        "schedule": schedule_str, "run_type": "weekly",
+        "next_run": None, "next_run_iso": None,
+        "last_run": None, "last_run_status": None,
+        "last_run_duration_seconds": None, "total_runs_completed": 0,
+    }
+
+    if not _scheduler:
+        base["next_run"] = "Scheduler not started"
+        return base
+
+    job = _scheduler.get_job("weekly_pipeline")
     if not job:
-        return {"active": False, "next_run": "No job scheduled", "state": "stopped"}
+        base["next_run"] = "No job scheduled"
+        return base
 
     if job.next_run_time is None:
-        return {"active": False, "next_run": "Paused — no runs will fire", "state": "paused"}
+        base["state"] = "paused"
+        base["next_run"] = "Paused — no runs will fire"
+    else:
+        base["running"] = True
+        base["active"] = True
+        base["state"] = "active"
+        base["next_run"] = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S")
+        base["next_run_iso"] = job.next_run_time.isoformat()
 
-    next_time = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S")
-    return {"active": True, "next_run": f"Full pipeline at {next_time}", "state": "active"}
+    # Pull last run from pipeline_runs table
+    try:
+        supabase = get_supabase()
+        runs_resp = supabase.table("pipeline_runs").select("*") \
+            .order("started_at", desc=True).limit(1).execute()
+        if runs_resp.data:
+            r = runs_resp.data[0]
+            base["last_run"] = r.get("completed_at") or r.get("started_at")
+            base["last_run_status"] = r.get("status")
+            base["last_run_duration_seconds"] = r.get("duration_seconds")
+        completed_resp = supabase.table("pipeline_runs").select("id") \
+            .eq("status", "completed").execute()
+        base["total_runs_completed"] = len(completed_resp.data or [])
+    except Exception as e:
+        logger.warning("[scheduler/status] Failed to load run history: %s", e)
+
+    return base
 
 
 @app.post("/scheduler/pause")
@@ -283,7 +336,7 @@ async def scheduler_pause():
     """Pause the nightly scheduler."""
     if not _scheduler:
         raise HTTPException(status_code=503, detail="Scheduler not running")
-    _scheduler.pause_job("nightly_pipeline")
+    _scheduler.pause_job("weekly_pipeline")
     return {"status": "paused", "message": "Nightly pipeline paused. No runs will fire until resumed."}
 
 
@@ -292,8 +345,8 @@ async def scheduler_resume():
     """Resume the nightly scheduler."""
     if not _scheduler:
         raise HTTPException(status_code=503, detail="Scheduler not running")
-    _scheduler.resume_job("nightly_pipeline")
-    job = _scheduler.get_job("nightly_pipeline")
+    _scheduler.resume_job("weekly_pipeline")
+    job = _scheduler.get_job("weekly_pipeline")
     next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if job and job.next_run_time else "unknown"
     return {"status": "active", "message": f"Scheduler resumed. Next run: {next_run}"}
 

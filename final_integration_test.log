@@ -1,0 +1,45 @@
+[setup] Parsing .env manually from C:\Users\vibraca\OneDrive - Evolution Equities LLC\Personal\Business\(1) Claude\Claude Code\Social Media Scraper\agents\.env
+[setup] SUPABASE_URL set: True
+[setup] APIFY_API_TOKEN set: True
+
+==============================================================================
+  PART A — BASELINE (Korean Sheet Masks, before Apify calls)
+==============================================================================
+Product: Korean Sheet Masks  (id=f0620e1e-83fd-45c9-ac92-dd922e4c674c)
+  current_score:           44.4
+  raw_score:               50.8
+  current_verdict:         pass
+  confidence_level:        medium
+  confidence_reason:       Medium: 1,000 comments across 5 platforms. Need 4,000 more comments and reduce negative ratio (currently 25.0%) for High.
+  total_comments_scored:   1000
+  active_platform_count:   5
+  last_scraped_at:         2026-04-16T15:03:26.170967+00:00
+  signals_social count:    19
+  signals_retail count:    6
+  posts count:             1000
+  comments count:          1000
+  pipeline_runs completed: 0
+
+==============================================================================
+  PART B — RUN PIPELINE ONCE (real Apify calls)
+==============================================================================
+run_id: 44dc4b73-829d-4964-9927-47296181f896
+[pipeline_runs] insert FAILED: {'message': 'null value in column "phase" of relation "pipeline_runs" violates not-null constraint', 'code': '23502', 'hint': None, 'details': None}
+
+----- [reddit] starting -----
+12:06:46 [INFO] agents.base_platform_agent: [hashtags] Loaded 12 hashtags for Korean Sheet Masks on reddit from database
+12:06:46 [INFO] agents.agent_reddit: [reddit pass1] Searching 12 subreddits for ['Korean Sheet Masks', 'korean sheet mask', 'K-beauty'] (lookback=90 days)
+12:06:46 [INFO] agents.agent_reddit: [reddit pass1] Querying 24 search URLs across 12 subreddits
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> Status: RUNNING, Message: 
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:47.017Z ACTOR: Pulling container image of build KgRZPY6MMR1psZ2cr from registry.
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:47.019Z ACTOR: Creating container.
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:47.369Z ACTOR: Starting container.
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:47.370Z ACTOR: Running under "LIMITED_PERMISSIONS" permission level.
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:47.584Z Running on architecture: x86_64
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:47.586Z Will run command: xvfb-run -a -s "-ac -screen 0 1920x1080x24+32 -nolisten tcp" /bin/sh -c npm start --silent
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:49.074Z [32mINFO[39m  System info[90m {"apifyVersion":"3.7.0","apifyClientVersion":"2.22.3","crawleeVersion":"3.16.0","osType":"Linux","nodeVersion":"v20.20.1"}[39m
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:49.276Z [32mINFO[39m  Found startUrl. Search params will be ignored.
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:50.213Z [32mINFO[39m  Starting the crawl.
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> Status: RUNNING, Message: Starting the crawler.
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:50.425Z [32mINFO[39m [33m PuppeteerCrawler:[39m Starting the crawler.
+[36m[apify.reddit-scraper-lite runId:mLadHPmNJN05WmCPH][0m -> 2026-04-16T16:06:53.638Z [32mINFO[39m  Processing https://www.reddit.com/r/AsianBeauty/search/?q=Korean+Sheet+Masks&sort=top&t=year&restrict_sr=1&include_over_18=on ...

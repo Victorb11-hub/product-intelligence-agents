@@ -32,7 +32,7 @@ API_PORT = 8000
 # ── Load environment variables from agents/.env ──
 def load_env():
     if ENV_FILE.exists():
-        for line in ENV_FILE.read_text().splitlines():
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, _, value = line.partition("=")
@@ -252,6 +252,31 @@ if __name__ == "__main__":
     print()
 
     load_env()
+
+    # ── Backfill mode: --backfill [--product "Name"] ──
+    if "--backfill" in sys.argv:
+        product_filter = None
+        if "--product" in sys.argv:
+            try:
+                product_filter = sys.argv[sys.argv.index("--product") + 1]
+            except IndexError:
+                print("[backfill] --product flag requires a value (product name)")
+                sys.exit(1)
+        print(f"[backfill] Running one-time 365-day historical pull"
+              + (f" for {product_filter}" if product_filter else " for all active products"))
+        sys.path.insert(0, str(AGENTS_DIR.parent))
+        os.environ["BACKFILL_MODE"] = "1"
+        if product_filter:
+            os.environ["BACKFILL_PRODUCT"] = product_filter
+        # Run pipeline directly without starting the scheduler
+        from scheduler import run_full_pipeline
+        try:
+            run_full_pipeline()
+            print("[backfill] Historical pull complete. Exiting.")
+            sys.exit(0)
+        except Exception as e:
+            print(f"[backfill] FAILED: {e}")
+            sys.exit(1)
 
     # Kill any stale processes on our ports first
     print("[cleanup] Checking for stale processes...")

@@ -1,65 +1,219 @@
 """
-Instagram Agent — apify/instagram-hashtag-scraper ($2.30/1K)
-Searches Instagram by hashtag. Extracts captions, engagement,
-comments for intent scoring. Feeds Job 1 — Early Detection (30% weight).
-"""
-import logging
-from datetime import date
+Instagram Agent — Two-pass architecture using BasePlatformAgent.
+  Pass 1: apify/instagram-hashtag-scraper — metadata only
+  Pass 2: apify/instagram-comment-scraper — deep comments on top posts
+All thresholds from .env. Hashtags from product_hashtags table.
+Feeds Job 1 — Early Detection (30% weight).
 
-from .base_agent import BaseAgent
+Field mappings confirmed from actor discovery:
+  Pass 1: id, url, shortCode, timestamp (ISO), likesCount, commentsCount,
+          type (Image/Video/Sidecar), productType (feed/clips/igtv),
+          caption, hashtags (list[str])
+  Pass 2: id, text, postUrl (join key!), likesCount, timestamp,
+          repliesCount, owner.is_verified
+  Note: Pass 1 has NO reel view counts — use engagement instead
+  Note: Pass 2 returns error placeholder rows — filter on "error" not in item
+"""
+import math
+import logging
+import time
+from datetime import date, datetime, timedelta, timezone
+
+from .base_platform_agent import BasePlatformAgent, _env_int, _env_float
 from .config import APIFY_API_TOKEN, APIFY_ACTORS
-from .skills.apify_helper import run_actor, extract_texts, extract_dates
+from .skills.apify_helper import run_actor
 
 logger = logging.getLogger(__name__)
 
 
-class InstagramAgent(BaseAgent):
+class InstagramAgent(BasePlatformAgent):
     PLATFORM = "instagram"
     SIGNAL_TABLE = "signals_social"
     REQUIRED_CREDENTIALS = ["APIFY_API_TOKEN"]
 
     def scrape(self, product_name: str, keywords: list, product: dict) -> dict:
-        # Build hashtag list (no spaces, no special chars)
-        all_terms = [product_name] + (keywords or [])
-        hashtags = list(set(
-            t.lower().replace(" ", "").replace("-", "").replace("&", "")
-            for t in all_terms[:5] if t
-        ))
+        """Main entry point — called by BaseAgent pipeline."""
+        start = time.time()
 
-        logger.info("[instagram] Searching hashtags: %s", hashtags)
+        hashtags = self.get_hashtags(product)
+        if not hashtags:
+            hashtags = [product_name.lower().replace(" ", "")]
+            logger.warning("[instagram] No hashtags in DB — using product name: %s", hashtags)
+
+        lookback = self.get_lookback_days(product)
+
+        # ═══════════════════════════════════════
+        # PASS 1 — Metadata discovery
+        # ═══════════════════════════════════════
+        try:
+            pass1_items = self.run_pass1(product, hashtags, lookback)
+        except Exception as e:
+            logger.error("[instagram] Pass 1 FAILED: %s", str(e)[:300])
+            return self._error_result(hashtags, str(e), time.time() - start)
+
+        filtered = self.filter_pass1(pass1_items, lookback)
+        top_n = _env_int("PASS2_POST_LIMIT", 20)
+        top_posts = filtered[:top_n]
+
+        # Count reels vs photos in final selection
+        reels = sum(1 for p in top_posts if self._is_reel(p))
+        photos = len(top_posts) - reels
+        reel_pct = round(reels / max(len(top_posts), 1) * 100, 1)
+        if reel_pct < 60 and len(top_posts) >= 5:
+            logger.warning("[instagram pass1] Reel percentage %.1f%% below 60%% target", reel_pct)
+
+        logger.info("[instagram pass1] %d posts found, %d passed filters (%d reels, %d photos). "
+                    "Reel pct: %.1f%%. Keeping top %d for Pass 2.",
+                    len(pass1_items), len(filtered), reels, photos, reel_pct, len(top_posts))
+
+        if not top_posts:
+            logger.warning("[instagram] No posts passed filters — skipping Pass 2")
+            return self._empty_result(hashtags, len(pass1_items), time.time() - start)
+
+        # Aggregate Pass 1 metrics
+        total_likes = sum(p.get("likesCount") or 0 for p in top_posts)
+        total_comments_count = sum(p.get("commentsCount") or 0 for p in top_posts)
+
+        # ═══════════════════════════════════════
+        # PASS 2 — Deep comments on winners
+        # ═══════════════════════════════════════
+        # Only fetch comments for posts that actually have comments
+        post_urls = [p.get("url") for p in top_posts if p.get("url") and (p.get("commentsCount") or 0) > 0]
+
+        try:
+            comments = self.run_pass2(post_urls, product) if post_urls else []
+        except Exception as e:
+            logger.error("[instagram] Pass 2 FAILED: %s", str(e)[:300])
+            comments = []
+
+        # Score comments grouped by parent post (using postUrl as join key)
+        all_scored = []
+        post_results = []
+        for post in top_posts:
+            likes = post.get("likesCount") or 0
+            cmts = post.get("commentsCount") or 0
+            parent_virality = math.log10(max(likes + cmts, 1) + 1)
+
+            post_url = post.get("url") or ""
+            post_comments = [c for c in comments if c.get("postUrl") == post_url]
+
+            scored = self.score_comments(post_comments, parent_virality)
+
+            top_comment = ""
+            if scored["scored_comments"]:
+                top_c = max(scored["scored_comments"], key=lambda c: c.get("_intent_score", 0))
+                top_comment = (top_c.get("text") or "")[:150]
+
+            post_results.append({
+                "url": post_url,
+                "type": "reel" if self._is_reel(post) else ("video" if post.get("type") == "Video" else "photo"),
+                "likes": likes,
+                "comment_count": cmts,
+                "views": 0,  # not available in Pass 1 actor
+                "caption_snippet": (post.get("caption") or "")[:100],
+                "top_comment": top_comment,
+                "purchase_signals": scored["purchase_signal_count"],
+                "negative_signals": scored["negative_signal_count"],
+            })
+
+            all_scored.extend(scored["scored_comments"])
+
+            # Log if Pass 2 returned 0 for a post that had comments in Pass 1
+            if cmts > 0 and not post_comments:
+                logger.info("[instagram] Zero comments returned for post with %d comments in Pass 1. "
+                            "Post may have restricted comments: %s", cmts, post_url)
+
+        # Aggregate all scored comments
+        total_stats = self.score_comments(
+            [{"text": c.get("text") or "", **c} for c in all_scored if c.get("text")],
+            parent_virality=1.0
+        )
+
+        # Write comments to DB with dedup
+        written = self.write_comments_to_db(all_scored, product["id"])
+        logger.info("[instagram] Wrote %d comments to DB", written)
+
+        self.log_run(2, {
+            "comment_count_total": total_stats["comment_count_total"],
+            "posts_enriched": len(top_posts),
+            "purchase_signal_count": total_stats["purchase_signal_count"],
+            "negative_signal_count": total_stats["negative_signal_count"],
+            "question_signal_count": total_stats["question_signal_count"],
+        })
+
+        self.update_confidence(product["id"])
+        self.update_product_scrape_tracking(product)
+
+        elapsed = time.time() - start
+
+        # Texts for BaseAgent pipeline
+        texts = [(p.get("caption") or "")[:200] for p in top_posts if p.get("caption")]
+
+        return {
+            "texts": texts,
+            "raw_items": top_posts,
+            "data_dates": [date.today().isoformat()],
+            "mention_count": len(top_posts),
+            "platform": "instagram",
+            "pass1_total": len(pass1_items),
+            "pass1_passed": len(filtered),
+            "pass1_reels": reels,
+            "pass1_photos": photos,
+            "reel_percentage": reel_pct,
+            "pass2_posts": len(top_posts),
+            "pass2_comments": total_stats["comment_count_total"],
+            "purchase_signals": total_stats["purchase_signal_count"],
+            "negative_signals": total_stats["negative_signal_count"],
+            "question_signals": total_stats["question_signal_count"],
+            "avg_weighted_intent": round(total_stats["weighted_comment_intent"], 4),
+            "weighted_sentiment": round(total_stats["weighted_sentiment"], 4),
+            "high_intent_count": total_stats["high_intent_count"],
+            "hashtags_searched": hashtags,
+            "top_posts": post_results[:10],
+            "duration_seconds": round(elapsed, 1),
+            "error": None,
+            # Aggregates for signal row / scoring
+            "total_likes": total_likes,
+            "total_comments": total_comments_count,
+            "creator_tier_score": 0.5,  # Hashtag scraper doesn't expose follower data
+            "buy_intent_comment_count": total_stats["purchase_signal_count"],
+            "problem_language_comment_count": total_stats["negative_signal_count"],
+            "growth_rate_wow": 0,
+            "repeat_purchase_pct": 0,
+        }
+
+    # ─── Pass 1: Metadata discovery ───
+
+    def run_pass1(self, product: dict, hashtags: list[str], lookback_days: int) -> list[dict]:
+        """Pull lightweight post metadata — no comments."""
+        max_hashtags = _env_int("INSTAGRAM_MAX_HASHTAGS", 10)
+        results_per = _env_int("INSTAGRAM_RESULTS_LIMIT", 150)
+        timeout = _env_int("INSTAGRAM_PASS1_TIMEOUT", 240)
+        max_items = _env_int("INSTAGRAM_PASS1_MAX_ITEMS", 200)
+
+        tags = hashtags[:max_hashtags]
+
+        logger.info("[instagram pass1] Searching %d hashtags, %d results/hashtag", len(tags), results_per)
 
         try:
             items = run_actor(
                 actor_id=APIFY_ACTORS["instagram"],
                 run_input={
-                    "hashtags": hashtags,
-                    "resultsLimit": 150,
+                    "hashtags": tags,
+                    "resultsLimit": results_per,
                 },
                 api_token=APIFY_API_TOKEN,
-                timeout_secs=240,
-                max_items=200,
+                timeout_secs=timeout,
+                max_items=max_items,
             )
         except Exception as e:
-            raise ValueError(f"Instagram scrape failed: {str(e)[:200]}")
+            logger.error("[instagram pass1] Actor failed: %s", str(e)[:300])
+            raise
 
-        # Filter out error items
+        # Filter out error placeholder rows
         items = [i for i in items if not i.get("error")]
 
-        if not items:
-            raise ValueError(f"No Instagram data found for {product_name}")
-
-        # Data ingestion filter
-        from .skills.data_ingestion import DataIngestionFilter
-        ingestion = DataIngestionFilter(self.supabase)
-        items, ingestion_stats = ingestion.get_new_items_only(
-            items, "instagram", product["id"], lookback_days=14
-        )
-        self.ingestion_stats = ingestion_stats
-
-        if not items:
-            raise ValueError(f"All Instagram items were old or duplicates for {product_name}")
-
-        # Deduplicate by post ID
+        # Dedup by post ID
         seen = set()
         unique = []
         for item in items:
@@ -69,58 +223,115 @@ class InstagramAgent(BaseAgent):
             seen.add(pid)
             unique.append(item)
 
-        # Extract texts from captions + comments
-        texts = []
-        for item in unique:
-            caption = (item.get("caption") or "").strip()
-            if caption:
-                texts.append(caption)
-            # Extract latest comments for intent scoring
-            comments = item.get("latestComments") or []
-            if isinstance(comments, list):
-                for c in comments[:5]:
-                    if isinstance(c, dict):
-                        ct = (c.get("text") or "").strip()
-                        if ct and len(ct) > 5:
-                            texts.append(ct)
-                    elif isinstance(c, str) and len(c) > 5:
-                        texts.append(c)
+        logger.info("[instagram pass1] %d items returned, %d unique after dedup", len(items), len(unique))
+        return unique
 
-        dates = extract_dates(unique, ["timestamp", "taken_at", "createdAt"])
+    def filter_pass1(self, items: list[dict], lookback_days: int) -> list[dict]:
+        """Filter by date + engagement, sort by comments desc / likes desc."""
+        min_reel_views = _env_int("MIN_VIEWS_INSTAGRAM_REEL", 30000)  # used as comment threshold for reels
+        min_photo_likes = _env_int("MIN_LIKES_INSTAGRAM_PHOTO", 500)
+        min_photo_comments = _env_int("MIN_COMMENTS_INSTAGRAM_PHOTO", 100)
+        min_engagement = _env_int("INSTAGRAM_ENGAGEMENT_THRESHOLD", 20)
+        cutoff = self.get_lookback_cutoff(lookback_days)
 
-        # Engagement metrics
-        total_likes = sum(item.get("likesCount", 0) or 0 for item in unique)
-        total_comments = sum(item.get("commentsCount", 0) or 0 for item in unique)
+        filtered = []
+        for item in items:
+            # Date filter
+            ts = item.get("timestamp") or item.get("taken_at") or ""
+            if ts:
+                try:
+                    if isinstance(ts, str):
+                        created = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    elif isinstance(ts, (int, float)):
+                        created = datetime.fromtimestamp(ts, tz=timezone.utc)
+                    else:
+                        created = None
+                    if created and created < cutoff:
+                        continue
+                except Exception:
+                    pass
 
-        # Reel weighting: reels get 1.2x engagement weight
-        reel_count = sum(1 for item in unique if item.get("type") in ("video", "reel", "clips"))
-        photo_count = len(unique) - reel_count
+            likes = item.get("likesCount") or 0
+            comments = item.get("commentsCount") or 0
 
-        # No ownerFollowers from this actor — set neutral creator tier
-        avg_creator = 0.5
+            # Must have comments to be useful for Pass 2
+            if comments <= 0:
+                continue
 
-        # Growth rate
-        hist = self.supabase.table("signals_social") \
-            .select("mention_count").eq("product_id", product["id"]) \
-            .eq("platform", "instagram").order("scraped_date", desc=True).limit(1).execute()
-        prev = hist.data[0]["mention_count"] if hist.data else len(unique)
-        growth = (len(unique) - prev) / max(prev, 1)
+            # Reel vs photo thresholds
+            if self._is_reel(item):
+                # Reels: comments >= 200 OR engagement above threshold
+                # (no view count available from this actor, so use engagement)
+                if comments < 200 and (likes + comments) < min_engagement:
+                    continue
+            else:
+                # Photos/videos: likes >= threshold OR comments >= threshold
+                if likes < min_photo_likes and comments < min_photo_comments:
+                    if (likes + comments) < min_engagement:
+                        continue
 
-        return {
-            "texts": texts,
-            "raw_items": unique,
-            "data_dates": dates,
-            "mention_count": len(unique),
-            "growth_rate_wow": round(growth, 4),
-            "total_likes": total_likes,
-            "total_comments": total_comments,
-            "reel_count": reel_count,
-            "photo_count": photo_count,
-            "creator_tier_score": avg_creator,
-            "buy_intent_comment_count": 0,
-            "problem_language_comment_count": 0,
-            "repeat_purchase_pct": 0,
-        }
+            filtered.append(item)
+
+        # Sort: primary commentsCount desc, secondary likesCount desc
+        filtered.sort(
+            key=lambda p: ((p.get("commentsCount") or 0), (p.get("likesCount") or 0)),
+            reverse=True
+        )
+
+        logger.info("[instagram pass1] %d passed engagement+date filters", len(filtered))
+        return filtered
+
+    # ─── Pass 2: Deep comments ───
+
+    def run_pass2(self, top_posts: list[dict], product: dict) -> list[dict]:
+        """Pull comments from top posts using dedicated comment scraper."""
+        post_urls = top_posts if isinstance(top_posts[0], str) else [
+            p.get("url") for p in top_posts if p.get("url")
+        ]
+        post_urls = [u for u in post_urls if u]
+
+        if not post_urls:
+            return []
+
+        comments_per = _env_int("PASS2_COMMENTS_PER_POST", 50)
+        timeout = _env_int("INSTAGRAM_PASS2_TIMEOUT", 300)
+        max_items = _env_int("INSTAGRAM_PASS2_MAX_ITEMS", 1500)
+
+        logger.info("[instagram pass2] Fetching comments from %d posts (%d max/post)",
+                    len(post_urls), comments_per)
+
+        try:
+            items = run_actor(
+                actor_id=APIFY_ACTORS["instagram_comments"],
+                run_input={
+                    "directUrls": post_urls,
+                    "resultsLimit": comments_per,
+                },
+                api_token=APIFY_API_TOKEN,
+                timeout_secs=timeout,
+                max_items=max_items,
+            )
+        except Exception as e:
+            logger.error("[instagram pass2] Actor failed: %s", str(e)[:300])
+            raise
+
+        # Filter out error placeholder rows AND items without text
+        comments = [item for item in items if item.get("text") and not item.get("error")]
+
+        unavailable = [i for i in items if i.get("error")]
+        for u in unavailable:
+            logger.info("[instagram] Post unavailable: %s. Skipping.", u.get("url") or u.get("inputUrl"))
+
+        logger.info("[instagram pass2] %d items returned, %d valid comments, %d unavailable posts",
+                    len(items), len(comments), len(unavailable))
+        return comments
+
+    # ─── Helpers ───
+
+    def _is_reel(self, post: dict) -> bool:
+        """Detect if post is a reel based on productType or type."""
+        return (post.get("productType") == "clips" or
+                post.get("type") == "Video")
 
     def build_signal_row(self, raw_data: dict, product_id: str) -> dict:
         return {
@@ -133,7 +344,39 @@ class InstagramAgent(BaseAgent):
             "creator_tier_score": raw_data.get("creator_tier_score", 0.5),
             "buy_intent_comment_count": raw_data.get("buy_intent_comment_count", 0),
             "problem_language_comment_count": raw_data.get("problem_language_comment_count", 0),
+            "high_intent_comment_count": raw_data.get("high_intent_count", 0),
+            "avg_intent_score": raw_data.get("avg_weighted_intent", 0),
             "total_upvotes": raw_data.get("total_likes", 0),
             "total_comment_count": raw_data.get("total_comments", 0),
             "sample_size": raw_data.get("mention_count", 0),
+            "purchase_signal_count": raw_data.get("purchase_signals", 0),
+            "negative_signal_count": raw_data.get("negative_signals", 0),
+            "question_signal_count": raw_data.get("question_signals", 0),
+            "comment_count_total": raw_data.get("pass2_comments", 0),
+            "weighted_comment_intent": raw_data.get("avg_weighted_intent", 0),
+            "weighted_sentiment": raw_data.get("weighted_sentiment", 0),
+            "lookback_days": self.get_lookback_days({"backfill_completed": True}),
+            "is_backfill": False,
         }
+
+    def _error_result(self, hashtags, error_msg, elapsed):
+        return {
+            "texts": [], "raw_items": [], "data_dates": [],
+            "mention_count": 0, "platform": "instagram",
+            "pass1_total": 0, "pass1_passed": 0, "pass1_reels": 0, "pass1_photos": 0,
+            "reel_percentage": 0,
+            "pass2_posts": 0, "pass2_comments": 0,
+            "purchase_signals": 0, "negative_signals": 0, "question_signals": 0,
+            "avg_weighted_intent": 0, "weighted_sentiment": 0, "high_intent_count": 0,
+            "hashtags_searched": hashtags, "top_posts": [],
+            "duration_seconds": round(elapsed, 1), "error": error_msg,
+            "total_likes": 0, "total_comments": 0,
+            "creator_tier_score": 0.5, "buy_intent_comment_count": 0,
+            "problem_language_comment_count": 0, "growth_rate_wow": 0,
+            "repeat_purchase_pct": 0,
+        }
+
+    def _empty_result(self, hashtags, total_found, elapsed):
+        result = self._error_result(hashtags, None, elapsed)
+        result["pass1_total"] = total_found
+        return result

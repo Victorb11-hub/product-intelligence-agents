@@ -23,6 +23,7 @@ def run_actor(
     api_token: str,
     timeout_secs: int = DEFAULT_TIMEOUT_SECS,
     max_items: int = 100,
+    memory_mbytes: int = 1024,
 ) -> list[dict]:
     """
     Run an Apify actor and return the dataset items.
@@ -33,6 +34,7 @@ def run_actor(
         api_token: Apify API token.
         timeout_secs: Max seconds to wait for completion.
         max_items: Max items to fetch from the dataset.
+        memory_mbytes: Memory allocation for the actor run (must be power of 2, min 512).
 
     Returns:
         List of result dicts from the actor's dataset.
@@ -46,22 +48,26 @@ def run_actor(
 
     logger.info("Starting Apify actor: %s", actor_id)
 
-    # Start the actor run
+    # Start the actor run (suppress verbose Apify status output)
+    import apify_client._logging as _al
+    _prev = logging.getLogger("apify_client").level
+    logging.getLogger("apify_client").setLevel(logging.WARNING)
     run = client.actor(actor_id).call(
         run_input=run_input,
         timeout_secs=timeout_secs,
-        memory_mbytes=256,
+        memory_mbytes=memory_mbytes,
     )
+    logging.getLogger("apify_client").setLevel(_prev)
 
     if not run:
         raise RuntimeError(f"Actor {actor_id} returned no run object")
 
     status = run.get("status")
-    if status not in ("SUCCEEDED", "RUNNING"):
+    if status not in ("SUCCEEDED", "RUNNING", "TIMED-OUT"):
         error_msg = run.get("statusMessage", "Unknown error")
         raise RuntimeError(f"Actor {actor_id} failed with status {status}: {error_msg}")
 
-    # Fetch dataset items
+    # Fetch dataset items (including partial results on timeout)
     dataset_id = run.get("defaultDatasetId")
     if not dataset_id:
         raise RuntimeError(f"Actor {actor_id} has no dataset")
@@ -70,7 +76,16 @@ def run_actor(
         client.dataset(dataset_id).iterate_items(limit=max_items)
     )
 
-    logger.info("Actor %s returned %d items", actor_id, len(items))
+    if status == "TIMED-OUT":
+        if items:
+            logger.warning("Actor %s timed out but returned %d partial items — using them",
+                           actor_id, len(items))
+        else:
+            error_msg = run.get("statusMessage", "Unknown error")
+            raise RuntimeError(f"Actor {actor_id} timed out with no results: {error_msg}")
+    else:
+        logger.info("Actor %s returned %d items", actor_id, len(items))
+
     return items
 
 

@@ -320,7 +320,8 @@ class BaseAgent(ABC):
         self._update_product_score(product_id, signal_row)
 
         # ── STEP 8: Integrity check ──
-        self._run_integrity_check(product_id, product_name, apify_item_count, db_agg, signal_row)
+        # Compare posts written THIS run (not total DB posts) to what DB aggregates found
+        self._run_integrity_check(product_id, product_name, posts_written, db_agg, signal_row)
 
     # ──────────────────────────────────────────────
     # POSTS-FIRST: Write every Apify item to posts table
@@ -434,9 +435,21 @@ class BaseAgent(ABC):
                     comment_count += 1
 
             except Exception as e:
-                logger.error("[%s] Failed to write post: %s", self.PLATFORM, str(e)[:200])
+                err_str = str(e)[:200]
+                # DB-level dedup backstop — unique constraint violation = duplicate, count + skip
+                if "duplicate" in err_str.lower() or "23505" in err_str or "unique" in err_str.lower():
+                    if not hasattr(self, "_dedup_skip_count"):
+                        self._dedup_skip_count = 0
+                    self._dedup_skip_count += 1
+                else:
+                    logger.error("[%s] Failed to write post: %s", self.PLATFORM, err_str)
 
-        logger.info("[%s] Wrote %d posts, %d comments to DB", self.PLATFORM, post_count, comment_count)
+        skip_count = getattr(self, "_dedup_skip_count", 0)
+        if skip_count > 0:
+            logger.info("[%s] Wrote %d posts, %d comments, skipped %d duplicates",
+                        self.PLATFORM, post_count, comment_count, skip_count)
+        else:
+            logger.info("[%s] Wrote %d posts, %d comments to DB", self.PLATFORM, post_count, comment_count)
         return post_count
 
     # ──────────────────────────────────────────────
@@ -483,23 +496,24 @@ class BaseAgent(ABC):
     # ──────────────────────────────────────────────
     def _run_integrity_check(
         self, product_id: str, product_name: str,
-        apify_item_count: int, db_agg: dict, signal_row: dict,
+        posts_written: int, db_agg: dict, signal_row: dict,
     ):
         """
         Verify data integrity after pipeline completes.
+        Compares posts written THIS run (via run_id filter) to DB aggregates.
         Checks:
-          1. Row count in posts matches what Apify returned
+          1. Row count in posts (this run) matches posts_written count
           2. total_upvotes in signal row matches sum from posts
           3. total_comment_count matches actual rows
           4. If any check fails → log warning, flag as degraded
         """
         errors = []
 
-        # Check 1: Row count
-        if db_agg["post_count"] != apify_item_count:
+        # Check 1: Row count — posts written this run vs DB aggregate for this run
+        if db_agg["post_count"] != posts_written:
             errors.append(
-                f"Row count mismatch: Apify returned {apify_item_count} items, "
-                f"posts table has {db_agg['post_count']}"
+                f"Row count mismatch: wrote {posts_written} posts, "
+                f"but DB query for run_id returned {db_agg['post_count']}"
             )
 
         # Check 2: Upvotes

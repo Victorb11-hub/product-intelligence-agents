@@ -387,35 +387,76 @@ def run_learning(db, run_id):
 # FULL NIGHTLY PIPELINE
 # ══════════════════════════════════════════════
 def run_full_pipeline():
-    """Execute the complete nightly pipeline."""
+    """Execute the complete pipeline (weekly, manual, or backfill)."""
     pipeline_start = datetime.now()
     run_id = str(uuid.uuid4())
 
     db = get_supabase()
 
-    # Prevent double-runs: skip if a run completed in the last 6 hours
+    # Determine run type
+    is_backfill = os.environ.get("BACKFILL_MODE") == "1"
+    backfill_product = os.environ.get("BACKFILL_PRODUCT", "").strip() or None
+    run_type = "backfill" if is_backfill else "weekly"
+    lookback = int(os.environ.get("LOOKBACK_DAYS_BACKFILL", "365")) if is_backfill \
+        else int(os.environ.get("LOOKBACK_DAYS_WEEKLY", "7"))
+
+    # Insert pipeline_runs row at start
+    pipeline_run_id = None
     try:
-        six_hours_ago = (datetime.now() - timedelta(hours=6)).isoformat()
-        recent = db.table("pipeline_runs").select("id") \
-            .eq("phase", "scoring_engine").eq("status", "complete") \
-            .gte("completed_at", six_hours_ago).limit(1).execute()
-        if recent.data:
-            logger.info("Recent pipeline run detected (last 6 hours) — skipping duplicate")
-            post_status("scraper-orchestrator", "idle", "Skipped — recent run already completed")
-            return
-    except Exception:
-        pass
+        run_row = db.table("pipeline_runs").insert({
+            "run_type": run_type,
+            "status": "running",
+            "started_at": pipeline_start.isoformat(),
+            "is_backfill": is_backfill,
+            "lookback_days": lookback,
+        }).execute()
+        if run_row.data:
+            pipeline_run_id = run_row.data[0].get("id")
+    except Exception as e:
+        logger.warning("Failed to write pipeline_runs start row: %s", e)
+
+    # Prevent double-runs: skip if a run completed in the last 6 hours (skip in backfill mode)
+    if not is_backfill:
+        try:
+            six_hours_ago = (datetime.now() - timedelta(hours=6)).isoformat()
+            recent = db.table("pipeline_runs").select("id") \
+                .eq("status", "completed") \
+                .gte("completed_at", six_hours_ago).limit(1).execute()
+            if recent.data:
+                logger.info("Recent pipeline run detected (last 6 hours) — skipping duplicate")
+                post_status("scraper-orchestrator", "idle", "Skipped — recent run already completed")
+                if pipeline_run_id:
+                    db.table("pipeline_runs").update({
+                        "status": "skipped",
+                        "completed_at": datetime.now().isoformat(),
+                        "error": "Duplicate run within 6 hours",
+                    }).eq("id", pipeline_run_id).execute()
+                return
+        except Exception:
+            pass
 
     logger.info("=" * 70)
-    logger.info("NIGHTLY PIPELINE STARTED — run_id: %s", run_id)
+    logger.info("PIPELINE STARTED — type=%s run_id=%s lookback=%d days", run_type, run_id, lookback)
     logger.info("=" * 70)
-    post_status("scraper-orchestrator", "busy", f"Nightly pipeline started — run {run_id[:8]}")
+    post_status("scraper-orchestrator", "busy", f"{run_type.title()} pipeline started — run {run_id[:8]}")
 
-    # Load active products
-    products = db.table("products").select("*").eq("active", True).execute().data
+    # Load active products (filter to single product if backfill --product flag set)
+    products_q = db.table("products").select("*").eq("active", True)
+    if backfill_product:
+        products_q = products_q.eq("name", backfill_product)
+    products = products_q.execute().data
     if not products:
-        logger.warning("No active products — pipeline complete")
-        post_status("scraper-orchestrator", "idle", "No active products")
+        msg = f"No active products" + (f" matching '{backfill_product}'" if backfill_product else "")
+        logger.warning("%s — pipeline complete", msg)
+        post_status("scraper-orchestrator", "idle", msg)
+        if pipeline_run_id:
+            db.table("pipeline_runs").update({
+                "status": "completed",
+                "completed_at": datetime.now().isoformat(),
+                "duration_seconds": int((datetime.now() - pipeline_start).total_seconds()),
+                "products_processed": 0,
+                "error": msg,
+            }).eq("id", pipeline_run_id).execute()
         return
 
     logger.info("Active products: %d", len(products))
@@ -460,11 +501,55 @@ def run_full_pipeline():
 
     # Done
     duration = (datetime.now() - pipeline_start).total_seconds()
+
+    # Aggregate per-platform stats from wave results
+    platform_stats = {}
+    total_posts = 0
+    total_comments = 0
+    total_signals = 0
+    for results in (wave1_results, wave2_results):
+        for platform, r in (results or {}).items():
+            if not isinstance(r, dict):
+                continue
+            ps = {
+                "status": r.get("status"),
+                "rows_written": r.get("rows_written", 0),
+                "duration_seconds": r.get("duration_seconds"),
+            }
+            # Pull richer stats from result if present
+            for k in ("pass1_total", "pass1_passed", "pass2_posts", "pass2_comments",
+                      "purchase_signals", "negative_signals", "question_signals"):
+                if k in r:
+                    ps[k] = r[k]
+            platform_stats[platform] = ps
+            total_posts += r.get("pass1_total", 0) or 0
+            total_comments += r.get("pass2_comments", 0) or 0
+            total_signals += r.get("purchase_signals", 0) or 0
+
+    # Write completion to pipeline_runs
+    if pipeline_run_id:
+        try:
+            db.table("pipeline_runs").update({
+                "status": "completed",
+                "completed_at": datetime.now().isoformat(),
+                "duration_seconds": int(duration),
+                "products_processed": len(products),
+                "total_posts_found": total_posts,
+                "total_comments_pulled": total_comments,
+                "total_signals_found": total_signals,
+                "platform_stats": platform_stats,
+            }).eq("id", pipeline_run_id).execute()
+        except Exception as e:
+            logger.warning("Failed to write pipeline_runs completion: %s", e)
+
     logger.info("=" * 70)
-    logger.info("NIGHTLY PIPELINE COMPLETE — %.1f seconds", duration)
+    logger.info("PIPELINE COMPLETE — %s in %.1f seconds (%d products, %d posts, %d comments)",
+                run_type, duration, len(products), total_posts, total_comments)
     logger.info("=" * 70)
     post_status("scraper-orchestrator", "done", f"Pipeline complete in {duration:.0f}s")
-    post_status("scraper-orchestrator", "idle", f"Pipeline complete. Next run at 1:00 AM.")
+
+    next_msg = "Next run: next Sunday at 1:00 AM" if run_type == "weekly" else "Backfill complete"
+    post_status("scraper-orchestrator", "idle", next_msg)
 
 
 # ══════════════════════════════════════════════
@@ -475,9 +560,18 @@ _scheduler_instance = None
 
 
 def create_scheduler():
+    """Create the APScheduler with weekly cron from .env config."""
+    day_of_week = os.environ.get("PIPELINE_SCHEDULE_DAY_OF_WEEK", "sun")
+    hour = int(os.environ.get("PIPELINE_SCHEDULE_HOUR", "1"))
+    minute = int(os.environ.get("PIPELINE_SCHEDULE_MINUTE", "0"))
+
     scheduler = BackgroundScheduler()
-    scheduler.add_job(run_full_pipeline, "cron", hour=1, minute=0, id="nightly_pipeline",
-                      misfire_grace_time=3600, max_instances=1)
+    scheduler.add_job(
+        run_full_pipeline, "cron",
+        day_of_week=day_of_week, hour=hour, minute=minute,
+        id="weekly_pipeline",
+        misfire_grace_time=3600, max_instances=1,
+    )
     return scheduler
 
 
@@ -485,8 +579,13 @@ def start_scheduler():
     global _scheduler_instance
     _scheduler_instance = create_scheduler()
     _scheduler_instance.start()
-    next_run = _scheduler_instance.get_job("nightly_pipeline").next_run_time
-    logger.info("Scheduler started. Next run: %s", next_run)
+    job = _scheduler_instance.get_job("weekly_pipeline")
+    next_run = job.next_run_time if job else "unknown"
+    day = os.environ.get("PIPELINE_SCHEDULE_DAY_OF_WEEK", "sun")
+    hour = os.environ.get("PIPELINE_SCHEDULE_HOUR", "1")
+    minute = os.environ.get("PIPELINE_SCHEDULE_MINUTE", "0")
+    logger.info("[scheduler] Weekly pipeline scheduled (%s @ %s:%02d). Next run: %s",
+                day, hour, int(minute), next_run)
     post_status("scraper-orchestrator", "idle", f"Scheduler active. Next run: {next_run}")
     return _scheduler_instance
 
@@ -501,7 +600,7 @@ def get_scheduler_status():
     if not s:
         return {"active": False, "next_run": "Scheduler not started", "state": "stopped"}
 
-    job = s.get_job("nightly_pipeline")
+    job = s.get_job("weekly_pipeline")
     if not job:
         return {"active": False, "next_run": "No job scheduled", "state": "stopped"}
 

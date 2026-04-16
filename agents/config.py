@@ -19,17 +19,20 @@ X_BEARER_TOKEN = os.environ.get("X_BEARER_TOKEN", "")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 # PyTrends needs no key
 
-# Apify actor IDs — one per platform
+# Apify actor IDs — reads from .env, falls back to defaults
 APIFY_ACTORS = {
-    "reddit":    "macrocosmos/reddit-scraper",
-    "tiktok":    "clockworks/tiktok-scraper",
-    "instagram": "apify/instagram-hashtag-scraper",
-    "facebook":  "apify/facebook-posts-scraper",
-    "amazon":    "junglee/amazon-crawler",
-    "walmart":   "epctex/walmart-scraper",
-    "etsy":      "epctex/etsy-scraper",
-    "alibaba":   "epctex/alibaba-scraper",
-    "pinterest": "apify/pinterest-crawler",
+    "reddit":              os.environ.get("APIFY_ACTOR_REDDIT_P1", "macrocosmos/reddit-scraper"),
+    "reddit_p2":           os.environ.get("APIFY_ACTOR_REDDIT_P2", "trudax/reddit-scraper-lite"),
+    "tiktok":              os.environ.get("APIFY_ACTOR_TIKTOK", "clockworks/tiktok-scraper"),
+    "tiktok_comments":     os.environ.get("APIFY_ACTOR_TIKTOK_COMMENTS", "clockworks/tiktok-comments-scraper"),
+    "instagram":           os.environ.get("APIFY_ACTOR_INSTAGRAM", "apify/instagram-hashtag-scraper"),
+    "instagram_comments":  os.environ.get("APIFY_ACTOR_INSTAGRAM_COMMENTS", "apify/instagram-comment-scraper"),
+    "facebook":            os.environ.get("APIFY_ACTOR_FACEBOOK", "apify/facebook-posts-scraper"),
+    "amazon":              os.environ.get("APIFY_ACTOR_AMAZON", "junglee/amazon-crawler"),
+    "walmart":             os.environ.get("APIFY_ACTOR_WALMART", "epctex/walmart-scraper"),
+    "etsy":                os.environ.get("APIFY_ACTOR_ETSY", "epctex/etsy-scraper"),
+    "alibaba":             os.environ.get("APIFY_ACTOR_ALIBABA", "epctex/alibaba-scraper"),
+    "pinterest":           os.environ.get("APIFY_ACTOR_PINTEREST", "apify/pinterest-crawler"),
 }
 
 class SupabaseClient:
