@@ -79,7 +79,23 @@
       "Bash(python _debug_query.py)",
       "Bash(set PYTHONIOENCODING=utf-8)",
       "Bash(python /tmp/views_backfill_check.py)",
-      "Bash(PYTHONIOENCODING=utf-8 python /tmp/views_backfill_check.py)"
+      "Bash(PYTHONIOENCODING=utf-8 python /tmp/views_backfill_check.py)",
+      "Bash(python _backfill_relevance.py)",
+      "Read(//c/Users/vibraca/AppData/Local/Temp/claude/c--Users-vibraca-OneDrive---Evolution-Equities-LLC-Personal-Business--1--Claude-Claude-Code-Social-Media-Scraper/383f1874-9874-4d89-91d4-7e9462c7f355/tasks/**)",
+      "Bash(kill 4290)",
+      "Bash(kill 4327)",
+      "Bash(python -u _backfill_relevance.py)",
+      "Bash(python rescore_transformer.py)",
+      "Bash(python _run_backfill_relevance.py)",
+      "Bash(python _query_relevance.py)",
+      "Bash(wmic process:*)",
+      "Bash(tasklist /v /fi \"imagename eq python.exe\")",
+      "Bash(ls -lt *.log *.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python \"/c/Users/vibraca/OneDrive - Evolution Equities LLC/Personal/Business/\\(1\\) Claude/Claude Code/Social Media Scraper/_db_sentiment_check.py\")",
+      "Bash(curl -s -m 15 \"https://yvzuyaemgrlhpsnfqjqv.supabase.co/rest/v1/comments?product_id=eq.f0620e1e-83fd-45c9-ac92-dd922e4c674c&select=id&limit=1\" -H \"apikey: sb_publishable_2i7akLDL_eQo5MUlv6lSyw_RMNnh3r7\" -H \"Prefer: count=exact\" -D - -o /dev/null)",
+      "Bash(curl -s -m 15 \"https://yvzuyaemgrlhpsnfqjqv.supabase.co/rest/v1/comments?product_id=eq.f0620e1e-83fd-45c9-ac92-dd922e4c674c&sentiment_score=eq.0&select=id&limit=1\" -H \"apikey: sb_publishable_2i7akLDL_eQo5MUlv6lSyw_RMNnh3r7\" -H \"Prefer: count=exact\" -D - -o /dev/null)",
+      "Bash(curl -s -m 15 \"https://yvzuyaemgrlhpsnfqjqv.supabase.co/rest/v1/comments?product_id=eq.f0620e1e-83fd-45c9-ac92-dd922e4c674c&sentiment_score=gt.0&select=id&limit=1\" -H \"apikey: sb_publishable_2i7akLDL_eQo5MUlv6lSyw_RMNnh3r7\" -H \"Prefer: count=exact\" -D - -o /dev/null)",
+      "Bash(curl -s -m 15 \"https://yvzuyaemgrlhpsnfqjqv.supabase.co/rest/v1/comments?product_id=eq.f0620e1e-83fd-45c9-ac92-dd922e4c674c&sentiment_score=lt.0&select=id&limit=1\" -H \"apikey: sb_publishable_2i7akLDL_eQo5MUlv6lSyw_RMNnh3r7\" -H \"Prefer: count=exact\" -D - -o /dev/null)"
     ]
   }
 }

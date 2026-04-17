@@ -61,10 +61,10 @@ def analyze_sentiment(text: str) -> dict:
         import torch
 
         inputs = tokenizer(
-            text,
+            text[:500],  # pre-truncate for speed on long texts
             return_tensors="pt",
             truncation=True,
-            max_length=512,
+            max_length=128,  # social media comments are short
             padding=True,
         )
 
@@ -99,9 +99,56 @@ def analyze_sentiment(text: str) -> dict:
         return _rule_based_sentiment(text)
 
 
-def analyze_batch(texts: list[str]) -> list[dict]:
-    """Analyze sentiment for a batch of texts."""
-    return [analyze_sentiment(t) for t in texts]
+def analyze_batch(texts: list[str], batch_size: int = 32) -> list[dict]:
+    """Analyze sentiment for a batch of texts. Uses batched inference when transformer is available."""
+    model, tokenizer = _load_model()
+
+    if model == "fallback" or not tokenizer:
+        return [_rule_based_sentiment(t) for t in texts]
+
+    try:
+        import torch
+
+        results = []
+        for i in range(0, len(texts), batch_size):
+            chunk = [t[:500] for t in texts[i:i + batch_size] if t and t.strip()]
+            if not chunk:
+                results.extend([{"sentiment_score": 0.0, "sentiment_confidence": 0.0, "label": "neutral"}] * (min(batch_size, len(texts) - i)))
+                continue
+
+            inputs = tokenizer(
+                chunk,
+                return_tensors="pt",
+                truncation=True,
+                max_length=128,
+                padding=True,
+            )
+
+            with torch.no_grad():
+                outputs = model(**inputs)
+                scores = torch.softmax(outputs.logits, dim=1)
+
+            for j in range(len(chunk)):
+                neg, neu, pos = scores[j].tolist()
+                sentiment_score = pos - neg
+                max_score = max(neg, neu, pos)
+                if pos > neg and pos > neu:
+                    label = "positive"
+                elif neg > pos and neg > neu:
+                    label = "negative"
+                else:
+                    label = "neutral"
+                results.append({
+                    "sentiment_score": round(sentiment_score, 4),
+                    "sentiment_confidence": round(max_score, 4),
+                    "label": label,
+                })
+
+        return results
+
+    except Exception as e:
+        logger.warning("Batch inference failed, falling back to per-item: %s", e)
+        return [analyze_sentiment(t) for t in texts]
 
 
 def aggregate_sentiment(results: list[dict]) -> dict:
