@@ -365,6 +365,9 @@ class BaseAgent(ABC):
                        item.get("upvotes") or 0)
             comment_count = (item.get("num_comments") or item.get("commentCount") or
                             item.get("commentsCount") or item.get("numComments") or 0)
+            # Universal views extraction (TikTok=playCount, Instagram=videoViewCount)
+            views = (item.get("playCount") or item.get("videoViewCount") or
+                     item.get("viewCount") or item.get("views") or 0)
             # Universal author extraction
             author_meta = item.get("authorMeta") or item.get("author") or {}
             if isinstance(author_meta, dict):
@@ -389,6 +392,7 @@ class BaseAgent(ABC):
                     "post_url": post_url[:2000] if post_url else None,
                     "subreddit": (item.get("communityName") or item.get("subreddit") or ""),
                     "upvotes": upvotes,
+                    "views": views,
                     "comment_count": comment_count,
                     "author": author[:200] if author else None,
                     "posted_at": posted_at,

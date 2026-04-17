@@ -149,6 +149,7 @@ class AmazonAgent(BaseAgent):
                     "post_body": f"ASIN: {p['asin']} | ${p['price']:.2f} | {p['rating']}★ | {p['review_count']} reviews",
                     "post_url": p["url"][:2000] if p["url"] else None,
                     "upvotes": p["review_count"],
+                    "views": 0,
                     "comment_count": 0,
                     "scraped_date": date.today().isoformat(),
                     "data_type": "post",
